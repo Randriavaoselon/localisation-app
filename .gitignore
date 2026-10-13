@@ -1,0 +1,63 @@
+
+# =========================
+# VARIABLES D'ENVIRONNEMENT
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# PYTHON / DJANGO (BACKEND)
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environnements virtuels
+venv/
+.venv/
+env/
+
+# Django
+staticfiles/
+media/
+*.log
+
+# Bases de données locales
+*.sqlite3
+*.db
+
+# =========================
+# REACT / NODE.JS (FRONTEND)
+# =========================
+node_modules/
+dist/
+build/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# =========================
+# OUTILS ET ÉDITEURS
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# =========================
+# TESTS ET COUVERTURE
+# =========================
+.coverage
+htmlcov/
+coverage/
