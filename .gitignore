@@ -1,3 +1,5 @@
+.secret_key
+wifi_reports.db
 
 # =========================
 # VARIABLES D'ENVIRONNEMENT
@@ -34,30 +36,3 @@ media/
 *.sqlite3
 *.db
 
-# =========================
-# REACT / NODE.JS (FRONTEND)
-# =========================
-node_modules/
-dist/
-build/
-.vite/
-npm-debug.log*
-yarn-debug.log*
-pnpm-debug.log*
-
-# =========================
-# OUTILS ET ÉDITEURS
-# =========================
-.vscode/
-.idea/
-*.swp
-*.swo
-.DS_Store
-Thumbs.db
-
-# =========================
-# TESTS ET COUVERTURE
-# =========================
-.coverage
-htmlcov/
-coverage/

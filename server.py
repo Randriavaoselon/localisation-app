@@ -27,6 +27,9 @@ Variables d'environnement :
     REPORT_INTERVAL      secondes entre deux envois d'un client (défaut 30)
     RETENTION_DAYS       durée de conservation de l'historique (défaut 30)
     STOP_RADIUS_M        distance (m) en dessous de laquelle des positions comptent comme le même lieu (défaut 150)
+    ENROLL_MINUTES       durée de validité d'un code d'activation Windows (défaut 30)
+    INSTALLER_PATH       installateur Windows servi aux utilisateurs connectés
+                         (défaut : installers/WifiTracker-Setup.exe à côté de server.py)
     TRUST_PROXY          1 = lire l'IP réelle dans X-Forwarded-For (derrière Render, Caddy, nginx...)
     TILE_URL / TILE_ATTR fond de carte (défaut OpenStreetMap ; voir README pour un autre fournisseur)
     HOST / PORT          adresse d'écoute pour 'python server.py'
@@ -44,7 +47,7 @@ import time
 from datetime import timedelta
 from functools import wraps
 
-from flask import Flask, Response, g, jsonify, redirect, request, session
+from flask import Flask, Response, g, jsonify, redirect, request, send_file, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
 DB_PATH = os.getenv("DB_PATH", "wifi_reports.db")
@@ -54,6 +57,7 @@ REPORT_INTERVAL = int(os.getenv("REPORT_INTERVAL", "30"))
 POLL_SECONDS = 10
 RETENTION_DAYS = int(os.getenv("RETENTION_DAYS", "30"))
 STOP_RADIUS_M = int(os.getenv("STOP_RADIUS_M", "150"))
+APPROX_ACCURACY_M = 2000   # au-delà, une position est enregistrée comme approximative
 ALLOW_SIGNUP = os.getenv("ALLOW_SIGNUP", "1") != "0"
 MAX_CLIENTS = int(os.getenv("MAX_CLIENTS_PER_USER", "10"))
 TRUST_PROXY = os.getenv("TRUST_PROXY") == "1"
@@ -61,6 +65,11 @@ COOKIE_SECURE = os.getenv("COOKIE_SECURE") == "1"
 TILE_URL = os.getenv("TILE_URL", "https://tile.openstreetmap.org/{z}/{x}/{y}.png")
 TILE_ATTR = os.getenv("TILE_ATTR", "&copy; contributeurs OpenStreetMap")
 
+ENROLL_MINUTES = int(os.getenv("ENROLL_MINUTES", "30"))
+INSTALLER_PATH = os.getenv("INSTALLER_PATH") or os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "installers", "WifiTracker-Setup.exe")
+CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"      # sans I, O, 0, 1 (confusions)
+CODE_RE = re.compile(r"[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}")
 USERNAME_RE = re.compile(r"[A-Za-z0-9_.\-]{3,32}")
 CLIENT_NAME_RE = re.compile(r"[\w .\-@]{1,64}")
 
@@ -114,6 +123,11 @@ CREATE TABLE IF NOT EXISTS clients (
   created_at REAL NOT NULL,
   last_poll REAL,
   UNIQUE (user_id, name)
+);
+CREATE TABLE IF NOT EXISTS enroll_codes (
+  code_hash TEXT PRIMARY KEY,
+  client_id INTEGER NOT NULL,
+  expires_at REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS reports (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -422,6 +436,53 @@ def api_client_token(cid):
     return jsonify(token=token)
 
 
+def new_code():
+    raw = "".join(secrets.choice(CODE_ALPHABET) for _ in range(12))
+    return f"{raw[:4]}-{raw[4:8]}-{raw[8:]}"
+
+
+def norm_code(value):
+    return str(value or "").strip().upper()
+
+
+@app.post("/api/clients/<int:cid>/enroll")
+@api_user
+def api_client_enroll(cid):
+    """Code d'activation (usage unique, durée limitée) pour installer ce client sur Windows."""
+    if not own_client(cid):
+        return jsonify(error="client introuvable"), 404
+    db, now = get_db(), time.time()
+    db.execute("DELETE FROM enroll_codes WHERE client_id = ? OR expires_at < ?", (cid, now))
+    code = new_code()
+    db.execute("INSERT INTO enroll_codes (code_hash, client_id, expires_at) VALUES (?,?,?)",
+               (hash_token(code), cid, now + ENROLL_MINUTES * 60))
+    db.commit()
+    return jsonify(code=code, expires_in_s=ENROLL_MINUTES * 60,
+                   download_url="/download/windows?code=" + code,
+                   installer_available=os.path.isfile(INSTALLER_PATH))
+
+
+@app.get("/download/windows")
+def download_windows():
+    """Installateur Windows : réservé aux utilisateurs connectés. Avec ?code=, le fichier est
+    nommé WifiTracker-Setup-<CODE>.exe et l'assistant d'installation y lit son code."""
+    user = current_user()
+    if user is None:
+        return redirect("/login")
+    if not os.path.isfile(INSTALLER_PATH):
+        return jsonify(error="installateur Windows non publié sur ce serveur"), 404
+    name, code = "WifiTracker-Setup.exe", norm_code(request.args.get("code"))
+    if code:
+        row = get_db().execute(
+            """SELECT e.expires_at FROM enroll_codes e JOIN clients c ON c.id = e.client_id
+               WHERE e.code_hash = ? AND c.user_id = ?""", (hash_token(code), user["id"])).fetchone()
+        if not row or row["expires_at"] < time.time():
+            return jsonify(error="code introuvable ou expiré : générez-en un nouveau"), 404
+        name = f"WifiTracker-Setup-{code}.exe"
+    return send_file(INSTALLER_PATH, as_attachment=True, download_name=name,
+                     mimetype="application/octet-stream")
+
+
 @app.delete("/api/clients/<int:cid>")
 @api_user
 def api_client_delete(cid):
@@ -557,6 +618,11 @@ def api_agent_report():
     nlist = d.get("neighbor_list")
     nlist = json.dumps(nlist[:50])[:8000] if isinstance(nlist, list) else None
 
+    # Une position annoncée à plus de 2 km de précision (ex. ±291 km renvoyés par un navigateur qui
+    # a localisé l'IP) n'est jamais une vraie position : on la marque approximative quoi qu'en dise le client.
+    acc = num(pos.get("accuracy_m"), 0, 1e7)
+    approx = 1 if (pos.get("approx") or (acc is not None and acc > APPROX_ACCURACY_M)) else 0
+
     cur = db.execute(
         """INSERT INTO reports (device, client_id, received_at, client_time, ssid, bssid, signal_dbm,
              neighbors, lat, lon, accuracy_m, altitude, altitude_accuracy, place, method,
@@ -565,9 +631,9 @@ def api_agent_report():
         (c["name"], c["id"], time.time(), txt(d.get("client_time"), 40),
          txt(wifi.get("ssid"), 64), txt(wifi.get("bssid"), 17),
          int(sig) if sig is not None else None, int(nb) if nb is not None else None,
-         lat, lon, num(pos.get("accuracy_m"), 0, 1e7), num(pos.get("altitude"), -1000, 100000),
+         lat, lon, acc, num(pos.get("altitude"), -1000, 100000),
          num(pos.get("altitude_accuracy"), 0, 1e6), txt(pos.get("place"), 200),
-         txt(pos.get("method"), 120), 1 if pos.get("approx") else 0, nlist),
+         txt(pos.get("method"), 120), approx, nlist),
     )
     _insert_count += 1
     if _insert_count % 200 == 0:  # purge périodique
@@ -575,6 +641,32 @@ def api_agent_report():
                    (time.time() - RETENTION_DAYS * 86400,))
     db.commit()
     return jsonify(ok=True, stored=True, id=cur.lastrowid, desired=c["desired"])
+
+
+@app.post("/api/agent/enroll")
+def api_agent_enroll():
+    """L'installateur échange un code d'activation contre le jeton du client (nouveau jeton :
+    l'ancien cesse de fonctionner). Le code est à usage unique."""
+    key = "enroll:" + client_ip()
+    if throttled(key, 10, 600):
+        return jsonify(error="trop de tentatives, réessayez plus tard"), 429
+    note_attempt(key)
+    code = norm_code(json_body().get("code"))
+    db = get_db()
+    row = None
+    if CODE_RE.fullmatch(code):
+        row = db.execute(
+            """SELECT e.client_id, e.expires_at, c.name FROM enroll_codes e
+               JOIN clients c ON c.id = e.client_id WHERE e.code_hash = ?""",
+            (hash_token(code),)).fetchone()
+    if row is None or row["expires_at"] < time.time():
+        return jsonify(error="code invalide ou expiré"), 400
+    if db.execute("DELETE FROM enroll_codes WHERE code_hash = ?", (hash_token(code),)).rowcount != 1:
+        return jsonify(error="code invalide ou expiré"), 400     # utilisé entre-temps
+    token = secrets.token_urlsafe(32)
+    db.execute("UPDATE clients SET token_hash = ? WHERE id = ?", (hash_token(token), row["client_id"]))
+    db.commit()
+    return jsonify(ok=True, token=token, name=row["name"])
 
 
 @app.get("/health")
@@ -678,6 +770,8 @@ DASHBOARD = r"""<!DOCTYPE html>
  .acts{margin-top:6px;display:flex;gap:6px}
  .acts button{border:1px solid #ccd;background:#fff;border-radius:4px;cursor:pointer;padding:2px 8px;font-size:12px}
  .acts button:hover{background:#f3f6fb}
+ #modalbox a.dl{display:inline-block;background:#0b6bcb;color:#fff;padding:9px 14px;border-radius:6px;
+  text-decoration:none;margin:4px 0 10px}
  .empty{padding:14px;color:#666;font-size:13px;cursor:default}
  #traj{flex:0 1 50%;overflow:auto;border-top:2px solid #0b6bcb;padding:10px 14px;font-size:12px}
  #traj[hidden]{display:none}
@@ -809,7 +903,7 @@ function details(c) {
     ["Lieu", c.place || "n/a"], ["Source", c.method || "n/a"],
     ["Dernier envoi", "il y a " + fmtAge(c.age_s)],
   ]);
-  if (c.approx) box.appendChild(el("div", "⚠️ Position approximative (IP)", "warn"));
+  if (c.approx) box.appendChild(el("div", "⚠️ Position approximative (IP ou imprécise) : à confirmer", "warn"));
   return box;
 }
 
@@ -830,7 +924,28 @@ async function copyText(text, button) {
   try { await navigator.clipboard.writeText(text); button.textContent = "✅ Copié"; }
   catch (e) { button.textContent = "Sélectionnez et copiez à la main"; }
 }
-function showCredentials(name, token, isNew) {
+async function windowsInstall(c) {
+  let j;
+  try { j = await api("/api/clients/" + c.id + "/enroll", "POST", {}); }
+  catch (e) { alert(e.message); return; }
+  showModal(box => {
+    box.appendChild(el("h2", "💻 Installer « " + c.name + " » sur Windows"));
+    if (j.installer_available) {
+      box.appendChild(el("p", "1. Téléchargez l'installateur, puis lancez-le sur le PC à suivre :", "note"));
+      const a = el("a", "⬇ Télécharger WifiTracker-Setup.exe", "dl"); a.href = j.download_url;
+      box.appendChild(a);
+      box.appendChild(el("p", "2. L'assistant reconnaît ce client tout seul. S'il demande un code d'activation, saisissez :", "note"));
+    } else {
+      box.appendChild(el("p", "L'installateur Windows n'est pas encore publié sur ce serveur (voir le README : " +
+        "build_installer.bat, puis dossier installers/). Si vous avez WifiTracker.exe, lancez-le et saisissez ce code :", "note"));
+    }
+    box.appendChild(el("pre", j.code));
+    box.appendChild(el("p", "Ce code est valable " + Math.round(j.expires_in_s / 60) + " minutes et ne sert qu'une fois. " +
+      "L'enregistrement remplace le jeton précédent de ce client : un client = un appareil.", "note"));
+    modalButtons(box, [btn("Fermer", closeModal, true)]);
+  });
+}
+function showCredentials(id, name, token, isNew) {
   const cmd = "python3 client.py --server " + location.origin + " --token " + token + " --save";
   showModal(box => {
     box.appendChild(el("h2", (isNew ? "✅ Client « " + name + " » créé" : "🔑 Nouveau jeton pour « " + name + " »")));
@@ -840,7 +955,8 @@ function showCredentials(name, token, isNew) {
       "Il est personnel, ne le partagez pas. Ensuite, vous pouvez vous déconnecter : le client " +
       "obéit aux boutons ▶ Démarrer / ⏹ Arrêter du tableau de bord.", "note"));
     const copy = btn("Copier la commande", () => copyText(cmd, copy));
-    modalButtons(box, [copy, btn("Fermer", closeModal, true)]);
+    modalButtons(box, [copy, btn("💻 Installer sur Windows", () => windowsInstall({id, name})),
+                       btn("Fermer", closeModal, true)]);
   });
 }
 function newClientDialog() {
@@ -854,7 +970,7 @@ function newClientDialog() {
       create.disabled = true; err.textContent = "";
       try {
         const j = await api("/api/clients", "POST", {name: input.value});
-        showCredentials(j.name, j.token, true); refresh();
+        showCredentials(j.id, j.name, j.token, true); refresh();
       } catch (e) { err.textContent = e.message; create.disabled = false; }
     }, true);
     input.onkeydown = e => { if (e.key === "Enter") create.click(); };
@@ -986,7 +1102,7 @@ async function command(c, action) {
 }
 function regenToken(c) {
   if (!confirm("Générer un nouveau jeton pour « " + c.name + " » ? L'ancien cessera de fonctionner.")) return;
-  api("/api/clients/" + c.id + "/token", "POST", {}).then(j => showCredentials(c.name, j.token, false))
+  api("/api/clients/" + c.id + "/token", "POST", {}).then(j => showCredentials(c.id, c.name, j.token, false))
     .catch(e => alert(e.message));
 }
 function removeClient(c) {
@@ -1040,6 +1156,7 @@ async function refresh() {
       c.desired === "running"
         ? actionButton("⏹ Arrêter", "Arrêter le suivi à distance", () => command(c, "stop"))
         : actionButton("▶ Démarrer", "Démarrer le suivi à distance", () => command(c, "start")),
+      actionButton("💻 Windows", "Installer ce client sur Windows", () => windowsInstall(c)),
       actionButton("🔑 Jeton", "Générer un nouveau jeton", () => regenToken(c)),
       actionButton("🗑", "Supprimer ce client", () => removeClient(c)));
     li.appendChild(acts);
