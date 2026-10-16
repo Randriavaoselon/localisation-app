@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  Wifi Tracker - installation du client sur Linux (par utilisateur, sans root)
+#  Suricate-tracker - installation du client sur Linux (par utilisateur, sans root)
 #
-#  Après l'installation, la commande « wifi-tracker » fonctionne depuis N'IMPORTE
+#  Après l'installation, la commande « suricate-tracker » fonctionne depuis N'IMPORTE
 #  quel dossier : plus besoin d'être dans le dossier du projet.
 #
 #  Le plus simple : le tableau de bord (bouton « 🐧 Linux » du client) affiche une commande
@@ -21,24 +21,24 @@
 #      --token JETON    jeton du client (alternative au code)
 #      --autostart      démarre le client automatiquement (systemd utilisateur, sinon autostart graphique)
 #      --no-open        ne pas ouvrir le navigateur (position via routeurs voisins puis IP)
-#      --uninstall      désinstalle tout (programme, service, configuration) ; aussi : wifi-tracker --remove-all
+#      --uninstall      désinstalle tout (programme, service, configuration) ; aussi : suricate-tracker --remove-all
 #      -h, --help       cette aide
 #
 #  Emplacements :
-#      programme       ~/.local/share/wifi-tracker/
-#      commande        ~/.local/bin/wifi-tracker
-#      configuration   ~/.config/wifi-tracker/config.json   (droits 600)
-#      service         ~/.config/systemd/user/wifi-tracker.service
+#      programme       ~/.local/share/suricate-tracker/
+#      commande        ~/.local/bin/suricate-tracker
+#      configuration   ~/.config/suricate-tracker/config.json   (droits 600)
+#      service         ~/.config/systemd/user/suricate-tracker.service
 # =============================================================================
 set -euo pipefail
 
-APP_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/wifi-tracker"
+APP_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/suricate-tracker"
 BIN_DIR="$HOME/.local/bin"
-LAUNCHER="$BIN_DIR/wifi-tracker"
+LAUNCHER="$BIN_DIR/suricate-tracker"
 CONF_DIR="${XDG_CONFIG_HOME:-$HOME/.config}"
 UNIT_DIR="$CONF_DIR/systemd/user"
-UNIT_FILE="$UNIT_DIR/wifi-tracker.service"
-DESKTOP_FILE="$CONF_DIR/autostart/wifi-tracker.desktop"
+UNIT_FILE="$UNIT_DIR/suricate-tracker.service"
+DESKTOP_FILE="$CONF_DIR/autostart/suricate-tracker.desktop"
 SELF="${BASH_SOURCE[0]:-}"          # vide quand le script arrive par « curl | bash »
 SRC_DIR=""
 [ -n "$SELF" ] && [ -f "$SELF" ] && SRC_DIR="$(cd "$(dirname "$SELF")" && pwd)"
@@ -76,16 +76,16 @@ done
 
 # ---------------------------------------------------------------- désinstallation
 if [ "$UNINSTALL" -eq 1 ]; then
-  say "🗑  Désinstallation de Wifi Tracker..."
+  say "🗑  Désinstallation de Suricate-tracker..."
   if have systemctl; then
-    systemctl --user disable --now wifi-tracker 2>/dev/null || true
+    systemctl --user disable --now suricate-tracker 2>/dev/null || true
   fi
   rm -f "$UNIT_FILE" "$DESKTOP_FILE"
   have systemctl && systemctl --user daemon-reload 2>/dev/null || true
   if [ -x "$LAUNCHER" ]; then "$LAUNCHER" --uninstall --silent 2>/dev/null || true; fi
   pkill -u "$(id -u)" -f "$APP_DIR/client.py" 2>/dev/null || true
   rm -f "$LAUNCHER"
-  rm -rf "$APP_DIR" "$CONF_DIR/wifi-tracker"
+  rm -rf "$APP_DIR" "$CONF_DIR/suricate-tracker"
   say "✅ Désinstallé (programme, service, configuration)."
   say "   Pensez à supprimer le client dans le tableau de bord (🗑) si vous ne l'utilisez plus."
   exit 0
@@ -154,10 +154,10 @@ else
   fi
 fi
 
-# ---------------------------------------------------------------- commande « wifi-tracker »
+# ---------------------------------------------------------------- commande « suricate-tracker »
 cat > "$LAUNCHER" <<EOF
 #!/bin/sh
-# Généré par install-linux.sh : lance le client Wifi Tracker depuis n'importe quel dossier.
+# Généré par install-linux.sh : lance le client Suricate-tracker depuis n'importe quel dossier.
 if [ "\${1:-}" = "--remove-all" ] && [ -f "$APP_DIR/install-linux.sh" ]; then exec bash "$APP_DIR/install-linux.sh" --uninstall; fi
 exec "$PY" "$APP_DIR/client.py" "\$@"
 EOF
@@ -167,9 +167,9 @@ chmod 755 "$LAUNCHER"
 case ":$PATH:" in
   *":$BIN_DIR:"*) ;;
   *)
-    LINE='export PATH="$HOME/.local/bin:$PATH"   # Wifi Tracker'
+    LINE='export PATH="$HOME/.local/bin:$PATH"   # Suricate-tracker'
     for rc in "$HOME/.profile" "$HOME/.bashrc" "$HOME/.zshrc"; do
-      if [ -f "$rc" ] && ! grep -qF '# Wifi Tracker' "$rc"; then printf '\n%s\n' "$LINE" >> "$rc"; fi
+      if [ -f "$rc" ] && ! grep -qF '# Suricate-tracker' "$rc"; then printf '\n%s\n' "$LINE" >> "$rc"; fi
     done
     [ -f "$HOME/.profile" ] || printf '%s\n' "$LINE" > "$HOME/.profile"
     export PATH="$BIN_DIR:$PATH"
@@ -197,13 +197,13 @@ fi
 
 # ---------------------------------------------------------------- démarrage automatique
 if [ "$AUTOSTART" -eq 1 ]; then
-  if [ ! -f "$CONF_DIR/wifi-tracker/config.json" ]; then
+  if [ ! -f "$CONF_DIR/suricate-tracker/config.json" ]; then
     say "⚠️  Pas encore de configuration : le démarrage automatique est ignoré. Relancez avec --server et --code (ou --token)."
   elif have systemctl && systemctl --user show-environment >/dev/null 2>&1; then
     mkdir -p "$UNIT_DIR"
     cat > "$UNIT_FILE" <<EOF
 [Unit]
-Description=Wifi Tracker client
+Description=Suricate-tracker client
 After=network-online.target
 
 [Service]
@@ -215,16 +215,16 @@ RestartSec=10
 WantedBy=default.target
 EOF
     systemctl --user daemon-reload
-    systemctl --user enable --now wifi-tracker
+    systemctl --user enable --now suricate-tracker
     say "✅ Service systemd utilisateur activé (démarre à l'ouverture de session)."
     say "   Pour qu'il démarre dès le boot, sans ouvrir de session :  sudo loginctl enable-linger \"$USER\""
-    say "   Journal en direct :  journalctl --user -u wifi-tracker -f"
+    say "   Journal en direct :  journalctl --user -u suricate-tracker -f"
   else
     mkdir -p "$(dirname "$DESKTOP_FILE")"
     cat > "$DESKTOP_FILE" <<EOF
 [Desktop Entry]
 Type=Application
-Name=Wifi Tracker
+Name=Suricate-tracker
 Exec="$LAUNCHER"$([ "$NO_OPEN" -eq 1 ] && printf ' --no-open')
 Terminal=false
 EOF
@@ -236,11 +236,11 @@ fi
 # ---------------------------------------------------------------- fin
 say ""
 say "✅ Installé. Depuis n'importe quel dossier :"
-say "     wifi-tracker                lancer le client"
-say "     wifi-tracker --setup        changer serveur / jeton"
-say "     wifi-tracker --once --debug test rapide (un seul envoi)"
-say "     wifi-tracker --remove-all   tout supprimer (programme, service, configuration)"
-if [ ! -f "$CONF_DIR/wifi-tracker/config.json" ]; then
+say "     suricate-tracker                lancer le client"
+say "     suricate-tracker --setup        changer serveur / jeton"
+say "     suricate-tracker --once --debug test rapide (un seul envoi)"
+say "     suricate-tracker --remove-all   tout supprimer (programme, service, configuration)"
+if [ ! -f "$CONF_DIR/suricate-tracker/config.json" ]; then
   say ""
-  say "ℹ️  Il reste à configurer :  wifi-tracker --server https://mon-serveur.com --token LE_JETON --save"
+  say "ℹ️  Il reste à configurer :  suricate-tracker --server https://mon-serveur.com --token LE_JETON --save"
 fi

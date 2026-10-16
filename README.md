@@ -1,4 +1,4 @@
-# Wifi Tracker (comptes + clients pilotés à distance)
+# Suricate-tracker (comptes + clients pilotés à distance)
 
 Chaque utilisateur crée un **compte** sur le serveur, puis des **clients** (un par appareil à suivre).
 Un client garde la **même identité** (son jeton) où qu'il aille : lieu A, lieu B, autre réseau Wi-Fi...
@@ -19,7 +19,7 @@ python server.py                    # http://127.0.0.1:5000
    ```bash
    python3 client.py --server http://127.0.0.1:5000 --token LE_JETON --save
    ```
-   `--save` mémorise la configuration (`~/.config/wifi-tracker/config.json`, droits 600) : ensuite,
+   `--save` mémorise la configuration (`~/.config/suricate-tracker/config.json`, droits 600) : ensuite,
    `python3 client.py` suffit.
 4. Le client se met en attente, puis obéit aux boutons **▶ Démarrer / ⏹ Arrêter** du tableau de bord.
    Vous pouvez vous **déconnecter** du compte : le client continue d'envoyer ses positions.
@@ -42,10 +42,10 @@ Cliquez sur un client dans la liste : le panneau **Trajectoire** s'ouvre.
 Pour une position précise, laissez ouverte la page locale que le client ouvre au démarrage (le navigateur
 fournit la position). Sans elle, le client utilise les routeurs voisins, puis l'IP.
 
-## Installer le client sur Linux (commande `wifi-tracker`, utilisable de partout)
+## Installer le client sur Linux (commande `suricate-tracker`, utilisable de partout)
 
-Plus besoin d'être dans le dossier du projet : l'installateur copie le client dans `~/.local/share/wifi-tracker/`
-(avec son propre environnement Python) et crée la commande `wifi-tracker`. Aucun droit root requis.
+Plus besoin d'être dans le dossier du projet : l'installateur copie le client dans `~/.local/share/suricate-tracker/`
+(avec son propre environnement Python) et crée la commande `suricate-tracker`. Aucun droit root requis.
 
 ### Depuis le tableau de bord (serveur déjà déployé)
 
@@ -72,8 +72,8 @@ déployés à côté de `server.py`** (le serveur les publie sans authentificati
 
 ### Ensuite, depuis n'importe quel dossier
 
-`wifi-tracker` (lancer), `wifi-tracker --setup` (changer serveur/jeton), `wifi-tracker --once --debug` (test),
-`wifi-tracker --remove-all` (tout désinstaller). `--autostart` démarre le client via un service systemd utilisateur
+`suricate-tracker` (lancer), `suricate-tracker --setup` (changer serveur/jeton), `suricate-tracker --once --debug` (test),
+`suricate-tracker --remove-all` (tout désinstaller). `--autostart` démarre le client via un service systemd utilisateur
 (sinon via l'autostart graphique) ; ajoutez `--no-open` pour ne jamais ouvrir le navigateur. Pour un démarrage dès le
 boot : `sudo loginctl enable-linger "$USER"`. Mise à jour : relancez la même commande.
 
@@ -97,9 +97,9 @@ des routeurs voisins puis de l'IP (moins précise).
 
 ```bash
 mkdir -p ~/.config/systemd/user
-cat > ~/.config/systemd/user/wifi-tracker.service << EOF
+cat > ~/.config/systemd/user/suricate-tracker.service << EOF
 [Unit]
-Description=Wifi Tracker client
+Description=Suricate-tracker client
 
 [Service]
 ExecStart=/usr/bin/python3 -u "$(readlink -f client.py)" --no-open
@@ -111,13 +111,13 @@ WantedBy=default.target
 EOF
 
 systemctl --user daemon-reload
-systemctl --user enable --now wifi-tracker     # active et démarre maintenant
+systemctl --user enable --now suricate-tracker     # active et démarre maintenant
 sudo loginctl enable-linger "$USER"            # démarrage au boot, sans ouvrir de session
 ```
 
-Les guillemets autour du chemin sont indispensables si un dossier contient un espace (ex. `Projet Wifi Tracker`) : sans eux, systemd coupe le chemin à l'espace et le service échoue.
+Les guillemets autour du chemin sont indispensables si un dossier contient un espace (ex. `Projet Suricate-tracker`) : sans eux, systemd coupe le chemin à l'espace et le service échoue.
 
-Vérifier : `systemctl --user status wifi-tracker` et `journalctl --user -u wifi-tracker -f` (journal en direct).
+Vérifier : `systemctl --user status suricate-tracker` et `journalctl --user -u suricate-tracker -f` (journal en direct).
 Redémarrez l'ordinateur : le client doit apparaître « connecté » dans le tableau de bord.
 
 ### Option B : à l'ouverture de session graphique (avec navigateur, position précise)
@@ -127,39 +127,39 @@ le navigateur. Le port de cette page est fixe (8973 par défaut) : le navigateur
 
 ```bash
 mkdir -p ~/.config/autostart
-cat > ~/.config/autostart/wifi-tracker.desktop << EOF
+cat > ~/.config/autostart/suricate-tracker.desktop << EOF
 [Desktop Entry]
 Type=Application
-Name=Wifi Tracker
+Name=Suricate-tracker
 Exec=/usr/bin/python3 "$(readlink -f client.py)"
 Terminal=false
 EOF
 ```
 
-Le client démarre à la prochaine ouverture de session. Pour l'arrêter : supprimez `~/.config/autostart/wifi-tracker.desktop`.
+Le client démarre à la prochaine ouverture de session. Pour l'arrêter : supprimez `~/.config/autostart/suricate-tracker.desktop`.
 
 ### Commandes utiles (option A)
 
 | Action | Commande |
 |---|---|
-| Redémarrer (après un nouveau jeton + `--save`) | `systemctl --user restart wifi-tracker` |
-| Arrêter | `systemctl --user stop wifi-tracker` |
-| Ne plus démarrer au boot | `systemctl --user disable --now wifi-tracker` |
-| Voir les messages du client | `journalctl --user -u wifi-tracker -f` |
+| Redémarrer (après un nouveau jeton + `--save`) | `systemctl --user restart suricate-tracker` |
+| Arrêter | `systemctl --user stop suricate-tracker` |
+| Ne plus démarrer au boot | `systemctl --user disable --now suricate-tracker` |
+| Voir les messages du client | `journalctl --user -u suricate-tracker -f` |
 
 Si le client affiche « Jeton refusé », le client a été supprimé ou son jeton régénéré : relancez la commande
 `--save` avec le nouveau jeton, puis redémarrez le service.
 
 ## Installer le client sur Windows (assistant Setup.exe)
 
-L'assistant d'installation (`WifiTracker-Setup.exe`) n'est **téléchargeable que par un utilisateur connecté** au
+L'assistant d'installation (`SuricateTracker-Setup.exe`) n'est **téléchargeable que par un utilisateur connecté** au
 tableau de bord : le serveur refuse le téléchargement (et renvoie vers la page de connexion) à toute personne
 qui n'a pas ouvert de session.
 
 ### Pour l'utilisateur
 
 1. Connectez-vous au tableau de bord, créez un client (**➕ Nouveau client**) ou prenez-en un existant.
-2. Cliquez **💻 Windows** sur ce client : une fenêtre propose **⬇ Télécharger WifiTracker-Setup.exe** et affiche un
+2. Cliquez **💻 Windows** sur ce client : une fenêtre propose **⬇ Télécharger SuricateTracker-Setup.exe** et affiche un
    **code d'activation** (`XXXX-XXXX-XXXX`, valable 30 minutes, utilisable une seule fois).
 3. Lancez le fichier téléchargé sur le PC à suivre et suivez l'assistant. Le fichier téléchargé porte le code dans son
    nom, l'assistant le **pré-remplit** (sinon, saisissez le code affiché dans le tableau de bord).
@@ -167,7 +167,7 @@ qui n'a pas ouvert de session.
    (case « Démarrer automatiquement avec Windows »). Il obéit aux boutons **▶ Démarrer / ⏹ Arrêter** du tableau de
    bord, même si vous vous déconnectez du compte.
 
-L'installation se fait pour l'utilisateur courant (pas besoin d'être administrateur). Wifi Tracker apparaît dans
+L'installation se fait pour l'utilisateur courant (pas besoin d'être administrateur). Suricate-tracker apparaît dans
 *Paramètres > Applications* (désinstallation propre : le client est fermé, le démarrage automatique et la
 configuration sont supprimés) et dans le menu Démarrer (*Configurer*, *Journal*, *Diagnostic*).
 
@@ -189,11 +189,11 @@ l'installation pour ne jamais ouvrir le navigateur ; la position vient alors des
 
 | Action | Comment |
 |---|---|
-| Changer serveur, jeton ou code | menu Démarrer > *Configurer Wifi Tracker* (accepte un jeton **ou** un code d'activation) |
-| Voir ce que fait le client | menu Démarrer > *Journal de Wifi Tracker* (`%APPDATA%\WifiTracker\client.log`) |
+| Changer serveur, jeton ou code | menu Démarrer > *Configurer Suricate-tracker* (accepte un jeton **ou** un code d'activation) |
+| Voir ce que fait le client | menu Démarrer > *Journal de Suricate-tracker* (`%APPDATA%\SuricateTracker\client.log`) |
 | Diagnostiquer en direct | menu Démarrer > *Diagnostic (console)* |
-| Arrêter tout de suite | **⏹ Arrêter** dans le tableau de bord, ou Gestionnaire des tâches > `WifiTracker.exe` |
-| Désinstaller | *Paramètres > Applications > Wifi Tracker*, puis **🗑** sur le client dans le tableau de bord |
+| Arrêter tout de suite | **⏹ Arrêter** dans le tableau de bord, ou Gestionnaire des tâches > `SuricateTracker.exe` |
+| Désinstaller | *Paramètres > Applications > Suricate-tracker*, puis **🗑** sur le client dans le tableau de bord |
 
 ### Pour vous : fabriquer et publier l'assistant
 
@@ -215,7 +215,7 @@ GitHub fabrique l'installateur pour vous, sur un Windows qu'il fournit, puis l'a
 2. Sur GitHub : onglet **Actions** > **Fabriquer l'installateur Windows** > **Run workflow**, saisissez l'adresse de
    votre serveur (ex. `https://mon-serveur.onrender.com`), laissez « Ajouter l'installateur au dépôt » coché, puis
    **Run workflow**.
-3. Attendez 3 à 6 minutes (pastille verte). L'installateur est ajouté au dépôt dans `installers/WifiTracker-Setup.exe`
+3. Attendez 3 à 6 minutes (pastille verte). L'installateur est ajouté au dépôt dans `installers/SuricateTracker-Setup.exe`
    (Render redéploie alors le serveur si le déploiement automatique est activé) et reste téléchargeable depuis la page
    de l'exécution (section **Artifacts**).
 4. À refaire chaque fois que `client.py`, `installer.iss` ou la vidéo changent.
@@ -233,8 +233,8 @@ permissions ». Chaque fabrication ajoute environ 15 Mo à l'historique du dép�
    ```bat
    build_installer.bat https://mon-serveur.onrender.com
    ```
-   Le script fabrique `dist\WifiTracker.exe` et `dist\WifiTracker-console.exe` (PyInstaller), puis
-   **`installers\WifiTracker-Setup.exe`** (Inno Setup). L'adresse de votre serveur est pré-remplie dans l'assistant.
+   Le script fabrique `dist\SuricateTracker.exe` et `dist\SuricateTracker-console.exe` (PyInstaller), puis
+   **`installers\SuricateTracker-Setup.exe`** (Inno Setup). L'adresse de votre serveur est pré-remplie dans l'assistant.
 4. Publiez l'installateur **avec le serveur** : le dossier `installers/` doit se trouver à côté de `server.py` sur
    l'hébergeur (ajoutez-le au dépôt Git déployé, par exemple avec **Add file > Upload files** sur GitHub).
 
@@ -269,7 +269,7 @@ simplement sur fond sombre. Pour la retirer ou modifier l'affichage : constante 
    export TRUST_PROXY=1            # derrière Render / Caddy / nginx : IP réelle pour la limitation de tentatives
    export DB_PATH="/data/wifi_reports.db"   # dossier persistant
    # export ENROLL_MINUTES=30     # durée de validité d'un code d'activation Windows
-   # export INSTALLER_PATH=...      # emplacement de WifiTracker-Setup.exe (défaut : installers/ à côté de server.py)
+   # export INSTALLER_PATH=...      # emplacement de SuricateTracker-Setup.exe (défaut : installers/ à côté de server.py)
    # export ALLOW_SIGNUP=0         # pour fermer les inscriptions une fois vos comptes créés
    ```
 2. **Lancer** : `gunicorn -w 1 -b 0.0.0.0:8000 server:app` (gardez `-w 1` : la limitation de tentatives est en mémoire).
@@ -311,3 +311,37 @@ export TILE_ATTR="&copy; MapTiler &copy; contributeurs OpenStreetMap"
 
 - **Altitude** : seulement si l'appareil a un GPS (téléphone). Sur un PC : « non disponible ».
 - L'API de trajectoire : `GET /api/trajectory/<id_client>?hours=24&points=1&approx=1` (session requise).
+
+# Fin
+   systemctl --user restart suricate-tracker
+   systemctl --user status suricate-tracker
+   journalctl --user -u suricate-tracker -f
+
+###############################
+
+   systemctl --user stop suricate-tracker
+   suricate-tracker --once --debug
+   systemctl --user start suricate-tracker
+
+# Configuration de demarage automatique avec navigateur
+
+systemctl --user disable --now suricate-tracker
+rm -f ~/.config/systemd/user/suricate-tracker.service
+systemctl --user daemon-reload
+
+mkdir -p ~/.config/autostart
+cat > ~/.config/autostart/suricate-tracker.desktop << EOF
+[Desktop Entry]
+Type=Application
+Name=Suricate-tracker
+Exec=$HOME/.local/bin/suricate-tracker
+Terminal=false
+EOF
+
+## Test Rapide:
+pkill -f client.py
+suricate-tracker &
+
+# Commande de mise à jours apre modification
+curl -fsSL http://127.0.0.1:5000/linux/install.sh | bash -s -- --server http://127.0.0.1:5000
+pkill -f client.py; suricate-tracker &

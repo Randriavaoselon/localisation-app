@@ -1,12 +1,12 @@
 ﻿; ============================================================================
-;  Wifi Tracker - assistant d'installation Windows (Inno Setup 6)
+;  Suricate-tracker - assistant d'installation Windows (Inno Setup 6)
 ;
 ;  Ne se compile pas à la main : lancez build_installer.bat, qui fabrique d'abord
-;  dist\WifiTracker.exe et dist\WifiTracker-console.exe, puis appelle :
+;  dist\SuricateTracker.exe et dist\SuricateTracker-console.exe, puis appelle :
 ;      ISCC.exe /DServerUrl=https://mon-serveur.onrender.com installer.iss
-;  Résultat : installers\WifiTracker-Setup.exe  (à publier avec le serveur)
+;  Résultat : installers\SuricateTracker-Setup.exe  (à publier avec le serveur)
 ; ============================================================================
-#define MyAppName "Wifi Tracker"
+#define MyAppName "Suricate-tracker"
 #define MyAppVersion "2.0"
 #ifndef ServerUrl
   #define ServerUrl ""
@@ -23,35 +23,35 @@ DisableProgramGroupPage=yes
 ; Installation pour l'utilisateur courant : pas besoin d'être administrateur.
 PrivilegesRequired=lowest
 OutputDir=installers
-OutputBaseFilename=WifiTracker-Setup
+OutputBaseFilename=SuricateTracker-Setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-UninstallDisplayIcon={app}\WifiTracker.exe
+UninstallDisplayIcon={app}\SuricateTracker.exe
 
 [Languages]
 Name: "french"; MessagesFile: "compiler:Languages\French.isl"
 
 [Tasks]
-Name: "autostart"; Description: "Démarrer Wifi Tracker automatiquement avec Windows"; GroupDescription: "Options :"
+Name: "autostart"; Description: "Démarrer Suricate-tracker automatiquement avec Windows"; GroupDescription: "Options :"
 Name: "openbrowser"; Description: "Ouvrir la page de position dans le navigateur (position plus précise)"; GroupDescription: "Options :"
 
 [Files]
-Source: "dist\WifiTracker.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "dist\WifiTracker-console.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\SuricateTracker.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\SuricateTracker-console.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\Configurer Wifi Tracker"; Filename: "{app}\WifiTracker.exe"; Parameters: "--setup"
-Name: "{group}\Journal de Wifi Tracker"; Filename: "{userappdata}\WifiTracker\client.log"
-Name: "{group}\Diagnostic (console)"; Filename: "{app}\WifiTracker-console.exe"; Parameters: "--debug"
-Name: "{group}\Désinstaller Wifi Tracker"; Filename: "{uninstallexe}"
+Name: "{group}\Configurer Suricate-tracker"; Filename: "{app}\SuricateTracker.exe"; Parameters: "--setup"
+Name: "{group}\Journal de Suricate-tracker"; Filename: "{userappdata}\SuricateTracker\client.log"
+Name: "{group}\Diagnostic (console)"; Filename: "{app}\SuricateTracker-console.exe"; Parameters: "--debug"
+Name: "{group}\Désinstaller Suricate-tracker"; Filename: "{uninstallexe}"
 
 [UninstallRun]
 ; Ferme le client, retire le démarrage automatique et la configuration, avant la suppression des fichiers.
-Filename: "{app}\WifiTracker.exe"; Parameters: "--uninstall --silent"; Flags: runhidden waituntilterminated; RunOnceId: "WifiTrackerCleanup"
+Filename: "{app}\SuricateTracker.exe"; Parameters: "--uninstall --silent"; Flags: runhidden waituntilterminated; RunOnceId: "SuricateTrackerCleanup"
 
 [UninstallDelete]
-Type: filesandordirs; Name: "{userappdata}\WifiTracker"
+Type: filesandordirs; Name: "{userappdata}\SuricateTracker"
 
 [Code]
 const
@@ -77,7 +77,7 @@ begin
   Result := True;
 end;
 
-{ Le serveur nomme le fichier WifiTracker-Setup-XXXX-XXXX-XXXX.exe : on y lit le code. }
+{ Le serveur nomme le fichier SuricateTracker-Setup-XXXX-XXXX-XXXX.exe : on y lit le code. }
 function CodeFromFileName: String;
 var
   Name: String;
@@ -99,7 +99,7 @@ procedure InitializeWizard;
 begin
   CfgPage := CreateInputQueryPage(wpSelectTasks,
     'Connexion au serveur',
-    'Associez cet ordinateur à votre compte Wifi Tracker',
+    'Associez cet ordinateur à votre compte Suricate-tracker',
     'Saisissez l''adresse du serveur et le code d''activation affiché dans le tableau de bord (bouton « Windows » du client). Si vous avez téléchargé cet installateur depuis le tableau de bord, le code est déjà rempli.');
   CfgPage.Add('Adresse du serveur :', False);
   CfgPage.Add('Code d''activation (valable 30 minutes, une seule utilisation) :', False);
@@ -134,7 +134,7 @@ function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   RC: Integer;
 begin
-  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM WifiTracker.exe /IM WifiTracker-console.exe', '', SW_HIDE, ewWaitUntilTerminated, RC);
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM SuricateTracker.exe /IM SuricateTracker-console.exe', '', SW_HIDE, ewWaitUntilTerminated, RC);
   Result := '';
 end;
 
@@ -152,23 +152,23 @@ begin
   if not WizardIsTaskSelected('openbrowser') then Params := Params + ' --no-open';
 
   RC := -1;
-  Launched := Exec(ExpandConstant('{app}\WifiTracker.exe'), Params, '', SW_HIDE, ewWaitUntilTerminated, RC);
+  Launched := Exec(ExpandConstant('{app}\SuricateTracker.exe'), Params, '', SW_HIDE, ewWaitUntilTerminated, RC);
   if Launched and (RC = 0) then
   begin
     { Lance le client tout de suite (sans fenêtre). }
-    Exec(ExpandConstant('{app}\WifiTracker.exe'), '', '', SW_HIDE, ewNoWait, RC);
+    Exec(ExpandConstant('{app}\SuricateTracker.exe'), '', '', SW_HIDE, ewNoWait, RC);
   end
   else
   begin
     if not Launched then
-      Msg := 'Wifi Tracker a été copié mais n''a pas pu démarrer.'
+      Msg := 'Suricate-tracker a été copié mais n''a pas pu démarrer.'
     else if RC = 2 then
       Msg := 'Le code d''activation est invalide, expiré ou déjà utilisé.'
     else if RC = 3 then
       Msg := 'Le serveur est injoignable (vérifiez l''adresse et la connexion Internet).'
     else
       Msg := 'L''enregistrement auprès du serveur a échoué (code ' + IntToStr(RC) + ').';
-    MsgBox(Msg + #13#10#13#10 + 'Wifi Tracker est installé. Générez un nouveau code dans le tableau de bord, ' +
-           'puis lancez « Configurer Wifi Tracker » depuis le menu Démarrer.', mbError, MB_OK);
+    MsgBox(Msg + #13#10#13#10 + 'Suricate-tracker est installé. Générez un nouveau code dans le tableau de bord, ' +
+           'puis lancez « Configurer Suricate-tracker » depuis le menu Démarrer.', mbError, MB_OK);
   end;
 end;

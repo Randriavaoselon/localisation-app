@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-server.py - Wifi Tracker multi-utilisateurs.
+server.py - Suricate-tracker multi-utilisateurs.
 
 Chaque utilisateur crée un compte, se connecte, puis crée ses propres « clients » (un par appareil).
 Chaque client reçoit un jeton unique. Le programme client.py tourne sur l'appareil, lit ses
@@ -29,7 +29,7 @@ Variables d'environnement :
     STOP_RADIUS_M        distance (m) en dessous de laquelle des positions comptent comme le même lieu (défaut 150)
     ENROLL_MINUTES       durée de validité d'un code d'activation Windows (défaut 30)
     INSTALLER_PATH       installateur Windows servi aux utilisateurs connectés
-                         (défaut : installers/WifiTracker-Setup.exe à côté de server.py)
+                         (défaut : installers/SuricateTracker-Setup.exe à côté de server.py)
     TRUST_PROXY          1 = lire l'IP réelle dans X-Forwarded-For (derrière Render, Caddy, nginx...)
     TILE_URL / TILE_ATTR fond de carte (défaut OpenStreetMap ; voir README pour un autre fournisseur)
     HOST / PORT          adresse d'écoute pour 'python server.py'
@@ -67,7 +67,7 @@ TILE_ATTR = os.getenv("TILE_ATTR", "&copy; contributeurs OpenStreetMap")
 
 ENROLL_MINUTES = int(os.getenv("ENROLL_MINUTES", "30"))
 INSTALLER_PATH = os.getenv("INSTALLER_PATH") or os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "installers", "WifiTracker-Setup.exe")
+    os.path.dirname(os.path.abspath(__file__)), "installers", "SuricateTracker-Setup.exe")
 CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"      # sans I, O, 0, 1 (confusions)
 CODE_RE = re.compile(r"[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}")
 USERNAME_RE = re.compile(r"[A-Za-z0-9_.\-]{3,32}")
@@ -465,20 +465,20 @@ def api_client_enroll(cid):
 @app.get("/download/windows")
 def download_windows():
     """Installateur Windows : réservé aux utilisateurs connectés. Avec ?code=, le fichier est
-    nommé WifiTracker-Setup-<CODE>.exe et l'assistant d'installation y lit son code."""
+    nommé SuricateTracker-Setup-<CODE>.exe et l'assistant d'installation y lit son code."""
     user = current_user()
     if user is None:
         return redirect("/login")
     if not os.path.isfile(INSTALLER_PATH):
         return jsonify(error="installateur Windows non publié sur ce serveur"), 404
-    name, code = "WifiTracker-Setup.exe", norm_code(request.args.get("code"))
+    name, code = "SuricateTracker-Setup.exe", norm_code(request.args.get("code"))
     if code:
         row = get_db().execute(
             """SELECT e.expires_at FROM enroll_codes e JOIN clients c ON c.id = e.client_id
                WHERE e.code_hash = ? AND c.user_id = ?""", (hash_token(code), user["id"])).fetchone()
         if not row or row["expires_at"] < time.time():
             return jsonify(error="code introuvable ou expiré : générez-en un nouveau"), 404
-        name = f"WifiTracker-Setup-{code}.exe"
+        name = f"SuricateTracker-Setup-{code}.exe"
     return send_file(INSTALLER_PATH, as_attachment=True, download_name=name,
                      mimetype="application/octet-stream")
 
@@ -511,6 +511,12 @@ def linux_client_video():
         return jsonify(error="vidéo non publiée"), 404
     return send_file(path, mimetype="video/mp4", max_age=3600)
 
+@app.get("/favicon.png")
+def favicon():
+    path = os.path.join(_HERE, "assets", "favicon.png")
+    if not os.path.isfile(path):
+        return "", 404
+    return send_file(path, mimetype="image/png", max_age=86400)
 
 @app.delete("/api/clients/<int:cid>")
 @api_user
@@ -709,7 +715,8 @@ def health():
 LOGIN_PAGE = r"""<!DOCTYPE html>
 <html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Wifi Tracker · Connexion</title>
+<title>Suricate-tracker · Connexion</title>
+   <link rel="icon" type="image/png" href="/favicon.png?v=1">
 <style>
  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
   font-family:system-ui,sans-serif;background:#f2f5f9;color:#222}
@@ -728,7 +735,7 @@ LOGIN_PAGE = r"""<!DOCTYPE html>
  small{color:#666}
 </style></head><body>
 <div class="card">
-  <h1>📡 Wifi Tracker</h1>
+  <h1>📡 Suricate-tracker</h1>
   <div class="tabs">
     <button id="tabLogin" class="on" type="button">Connexion</button>
     <button id="tabSignup" type="button">Créer un compte</button>
@@ -777,7 +784,8 @@ $("p").onkeydown = e => { if (e.key === "Enter") submit(); };
 DASHBOARD = r"""<!DOCTYPE html>
 <html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Wifi Tracker</title>
+<title>Suricate-tracker</title>
+   <link rel="icon" type="image/png" href="/favicon.png?v=1">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
  html,body{height:100%;margin:0;font-family:system-ui,sans-serif;color:#222}
@@ -838,7 +846,7 @@ DASHBOARD = r"""<!DOCTYPE html>
 </style></head><body>
 <div id="side">
   <div id="top">
-    <h1>📡 Wifi Tracker</h1>
+    <h1>📡 Suricate-tracker</h1>
     <div id="me"><span id="who"></span><button id="logout" type="button">Déconnexion</button></div>
   </div>
   <div id="status">Chargement…</div>
@@ -968,7 +976,7 @@ async function linuxInstall(c) {
     box.appendChild(el("pre", cmd));
     box.appendChild(el("p", "Le code est valable " + Math.round(j.expires_in_s / 60) + " minutes et ne sert qu'une fois. " +
       "L'enregistrement remplace le jeton précédent de ce client : un client = un appareil. " +
-      "Ensuite, la commande « wifi-tracker » est disponible partout. Ajoutez --no-open pour ne jamais ouvrir le navigateur.", "note"));
+      "Ensuite, la commande « suricate-tracker » est disponible partout. Ajoutez --no-open pour ne jamais ouvrir le navigateur.", "note"));
     const copy = btn("Copier la commande", () => copyText(cmd, copy));
     modalButtons(box, [copy, btn("Fermer", closeModal, true)]);
   });
@@ -981,12 +989,12 @@ async function windowsInstall(c) {
     box.appendChild(el("h2", "💻 Installer « " + c.name + " » sur Windows"));
     if (j.installer_available) {
       box.appendChild(el("p", "1. Téléchargez l'installateur, puis lancez-le sur le PC à suivre :", "note"));
-      const a = el("a", "⬇ Télécharger WifiTracker-Setup.exe", "dl"); a.href = j.download_url;
+      const a = el("a", "⬇ Télécharger SuricateTracker-Setup.exe", "dl"); a.href = j.download_url;
       box.appendChild(a);
       box.appendChild(el("p", "2. L'assistant reconnaît ce client tout seul. S'il demande un code d'activation, saisissez :", "note"));
     } else {
       box.appendChild(el("p", "L'installateur Windows n'est pas encore publié sur ce serveur (voir le README : " +
-        "build_installer.bat, puis dossier installers/). Si vous avez WifiTracker.exe, lancez-le et saisissez ce code :", "note"));
+        "build_installer.bat, puis dossier installers/). Si vous avez SuricateTracker.exe, lancez-le et saisissez ce code :", "note"));
     }
     box.appendChild(el("pre", j.code));
     box.appendChild(el("p", "Ce code est valable " + Math.round(j.expires_in_s / 60) + " minutes et ne sert qu'une fois. " +
@@ -999,7 +1007,7 @@ function showCredentials(id, name, token, isNew) {
   showModal(box => {
     box.appendChild(el("h2", (isNew ? "✅ Client « " + name + " » créé" : "🔑 Nouveau jeton pour « " + name + " »")));
     box.appendChild(el("p", "Sur l'appareil Linux à suivre, collez cette commande dans un terminal (une seule fois, " +
-      "depuis n'importe quel dossier). Elle installe la commande « wifi-tracker » et le démarrage automatique :", "note"));
+      "depuis n'importe quel dossier). Elle installe la commande « suricate-tracker » et le démarrage automatique :", "note"));
     box.appendChild(el("pre", cmd));
     box.appendChild(el("p", "⚠️ Ce jeton ne sera plus affiché : copiez la commande maintenant. " +
       "Il est personnel, ne le partagez pas. Ensuite, vous pouvez vous déconnecter : le client " +

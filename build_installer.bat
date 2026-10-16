@@ -1,6 +1,6 @@
 @echo off
 rem ===========================================================================
-rem  Fabrique l'assistant d'installation : installers\WifiTracker-Setup.exe
+rem  Fabrique l'assistant d'installation : installers\SuricateTracker-Setup.exe
 rem
 rem  Prerequis sur ce PC Windows :
 rem    - Python 3.10+ (python.org, avec "tcl/tk and IDLE" coche)
@@ -17,7 +17,7 @@ if "%SERVER_URL%"=="" set /p SERVER_URL=Adresse de votre serveur (ex. https://mo
 if "%SERVER_URL%"=="" goto :nourl
 
 echo.
-echo === Etape 1 : construction de WifiTracker.exe ===
+echo === Etape 1 : construction de SuricateTracker.exe ===
 call build_windows.bat nopause || goto :error
 
 echo.
@@ -33,9 +33,9 @@ echo === Etape 3 : construction de l'assistant d'installation ===
 "%ISCC%" "/DServerUrl=%SERVER_URL%" installer.iss || goto :error
 
 echo.
-echo Termine : %~dp0installers\WifiTracker-Setup.exe
+echo Termine : %~dp0installers\SuricateTracker-Setup.exe
 echo Etape suivante : publiez ce fichier avec le serveur (voir le README), par exemple :
-echo     git add installers/WifiTracker-Setup.exe ^&^& git commit -m "Installateur Windows" ^&^& git push
+echo     git add installers/SuricateTracker-Setup.exe ^&^& git commit -m "Installateur Windows" ^&^& git push
 if /I not "%~2"=="nopause" pause
 exit /b 0
 
