@@ -42,6 +42,41 @@ Cliquez sur un client dans la liste : le panneau **Trajectoire** s'ouvre.
 Pour une position précise, laissez ouverte la page locale que le client ouvre au démarrage (le navigateur
 fournit la position). Sans elle, le client utilise les routeurs voisins, puis l'IP.
 
+## Installer le client sur Linux (commande `wifi-tracker`, utilisable de partout)
+
+Plus besoin d'être dans le dossier du projet : l'installateur copie le client dans `~/.local/share/wifi-tracker/`
+(avec son propre environnement Python) et crée la commande `wifi-tracker`. Aucun droit root requis.
+
+### Depuis le tableau de bord (serveur déjà déployé)
+
+La commande est **générée toute prête**, avec l'adresse de votre serveur et le jeton/code déjà remplis :
+
+- à la création d'un client (**➕ Nouveau client**), la fenêtre affiche la commande (avec le jeton) ;
+- pour un client existant, bouton **🐧 Linux** : commande avec un **code d'activation** (30 min, usage unique,
+  recommandé : le jeton n'apparaît pas dans l'historique du shell).
+
+Collez-la dans un terminal sur l'appareil à suivre :
+
+```bash
+curl -fsSL https://votre-domaine.com/linux/install.sh | bash -s -- --server https://votre-domaine.com --code XXXX-XXXX-XXXX --autostart
+```
+
+Le script télécharge `client.py` depuis votre serveur : **`install-linux.sh`, `client.py` et `assets/` doivent donc être
+déployés à côté de `server.py`** (le serveur les publie sans authentification sous `/linux/` ; ils ne contiennent aucun secret).
+
+### Depuis un dossier local (sans passer par le serveur)
+
+```bash
+./install-linux.sh --server https://votre-domaine.com --token LE_JETON --autostart    # ou --code XXXX-XXXX-XXXX
+```
+
+### Ensuite, depuis n'importe quel dossier
+
+`wifi-tracker` (lancer), `wifi-tracker --setup` (changer serveur/jeton), `wifi-tracker --once --debug` (test),
+`wifi-tracker --remove-all` (tout désinstaller). `--autostart` démarre le client via un service systemd utilisateur
+(sinon via l'autostart graphique) ; ajoutez `--no-open` pour ne jamais ouvrir le navigateur. Pour un démarrage dès le
+boot : `sudo loginctl enable-linger "$USER"`. Mise à jour : relancez la même commande.
+
 ## Lancer le client automatiquement au démarrage (Linux / Kali)
 
 Un client doit tourner sur l'appareil : le serveur ne peut pas lancer un programme qui n'y est pas installé.

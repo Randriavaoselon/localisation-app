@@ -483,6 +483,35 @@ def download_windows():
                      mimetype="application/octet-stream")
 
 
+_HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+@app.get("/linux/install.sh")
+def linux_install_script():
+    """Script d'installation Linux (sans secret) : `curl -fsSL <serveur>/linux/install.sh | bash -s -- ...`."""
+    path = os.path.join(_HERE, "install-linux.sh")
+    if not os.path.isfile(path):
+        return jsonify(error="install-linux.sh non publié sur ce serveur"), 404
+    return send_file(path, mimetype="text/x-shellscript", max_age=0)
+
+
+@app.get("/linux/client.py")
+def linux_client_source():
+    """Programme client (sans secret), téléchargé par install-linux.sh."""
+    path = os.path.join(_HERE, "client.py")
+    if not os.path.isfile(path):
+        return jsonify(error="client.py non publié sur ce serveur"), 404
+    return send_file(path, mimetype="text/x-python", max_age=0)
+
+
+@app.get("/linux/assets/background.mp4")
+def linux_client_video():
+    path = os.path.join(_HERE, "assets", "background.mp4")
+    if not os.path.isfile(path):
+        return jsonify(error="vidéo non publiée"), 404
+    return send_file(path, mimetype="video/mp4", max_age=3600)
+
+
 @app.delete("/api/clients/<int:cid>")
 @api_user
 def api_client_delete(cid):
@@ -924,6 +953,26 @@ async function copyText(text, button) {
   try { await navigator.clipboard.writeText(text); button.textContent = "✅ Copié"; }
   catch (e) { button.textContent = "Sélectionnez et copiez à la main"; }
 }
+function linuxCommand(auth) {
+  return "curl -fsSL " + location.origin + "/linux/install.sh | bash -s -- --server " + location.origin +
+         " " + auth + " --autostart";
+}
+async function linuxInstall(c) {
+  let j;
+  try { j = await api("/api/clients/" + c.id + "/enroll", "POST", {}); }
+  catch (e) { alert(e.message); return; }
+  const cmd = linuxCommand("--code " + j.code);
+  showModal(box => {
+    box.appendChild(el("h2", "🐧 Installer « " + c.name + " » sur Linux"));
+    box.appendChild(el("p", "Sur l'appareil à suivre, collez cette commande dans un terminal :", "note"));
+    box.appendChild(el("pre", cmd));
+    box.appendChild(el("p", "Le code est valable " + Math.round(j.expires_in_s / 60) + " minutes et ne sert qu'une fois. " +
+      "L'enregistrement remplace le jeton précédent de ce client : un client = un appareil. " +
+      "Ensuite, la commande « wifi-tracker » est disponible partout. Ajoutez --no-open pour ne jamais ouvrir le navigateur.", "note"));
+    const copy = btn("Copier la commande", () => copyText(cmd, copy));
+    modalButtons(box, [copy, btn("Fermer", closeModal, true)]);
+  });
+}
 async function windowsInstall(c) {
   let j;
   try { j = await api("/api/clients/" + c.id + "/enroll", "POST", {}); }
@@ -946,16 +995,17 @@ async function windowsInstall(c) {
   });
 }
 function showCredentials(id, name, token, isNew) {
-  const cmd = "python3 client.py --server " + location.origin + " --token " + token + " --save";
+  const cmd = linuxCommand("--token " + token);
   showModal(box => {
     box.appendChild(el("h2", (isNew ? "✅ Client « " + name + " » créé" : "🔑 Nouveau jeton pour « " + name + " »")));
-    box.appendChild(el("p", "Sur l'appareil à suivre, lancez cette commande une seule fois :", "note"));
+    box.appendChild(el("p", "Sur l'appareil Linux à suivre, collez cette commande dans un terminal (une seule fois, " +
+      "depuis n'importe quel dossier). Elle installe la commande « wifi-tracker » et le démarrage automatique :", "note"));
     box.appendChild(el("pre", cmd));
     box.appendChild(el("p", "⚠️ Ce jeton ne sera plus affiché : copiez la commande maintenant. " +
       "Il est personnel, ne le partagez pas. Ensuite, vous pouvez vous déconnecter : le client " +
       "obéit aux boutons ▶ Démarrer / ⏹ Arrêter du tableau de bord.", "note"));
     const copy = btn("Copier la commande", () => copyText(cmd, copy));
-    modalButtons(box, [copy, btn("💻 Installer sur Windows", () => windowsInstall({id, name})),
+    modalButtons(box, [copy, btn("💻 Windows", () => windowsInstall({id, name})),
                        btn("Fermer", closeModal, true)]);
   });
 }
@@ -1093,7 +1143,7 @@ function select(c) {
 /* ---------- Clients (liste, commandes, positions actuelles) ---------- */
 function agentLine(c) {
   if (!c.agent_online) return c.desired === "running"
-    ? "⚪ client non connecté (lancez client.py sur l'appareil)" : "⚪ client non connecté · suivi arrêté";
+    ? "⚪ client non connecté (installez le client sur l'appareil : bouton 🐧 Linux ou 💻 Windows)" : "⚪ client non connecté · suivi arrêté";
   return c.desired === "running" ? "🟢 client connecté · suivi actif" : "⏸ client connecté · suivi arrêté";
 }
 async function command(c, action) {
@@ -1156,6 +1206,7 @@ async function refresh() {
       c.desired === "running"
         ? actionButton("⏹ Arrêter", "Arrêter le suivi à distance", () => command(c, "stop"))
         : actionButton("▶ Démarrer", "Démarrer le suivi à distance", () => command(c, "start")),
+      actionButton("🐧 Linux", "Installer ce client sur Linux", () => linuxInstall(c)),
       actionButton("💻 Windows", "Installer ce client sur Windows", () => windowsInstall(c)),
       actionButton("🔑 Jeton", "Générer un nouveau jeton", () => regenToken(c)),
       actionButton("🗑", "Supprimer ce client", () => removeClient(c)));
