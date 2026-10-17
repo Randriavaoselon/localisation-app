@@ -1,6 +1,5 @@
 name: Fabriquer l'application Android (APK)
 
-# Lancement manuel : onglet « Actions » > « Fabriquer l'application Android (APK) » > « Run workflow ».
 on:
   workflow_dispatch:
     inputs:
@@ -15,11 +14,12 @@ on:
         default: true
 
 permissions:
-  contents: write   # nécessaire pour ajouter la clé de signature et installers/SuricateTracker.apk au dépôt
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -32,9 +32,19 @@ jobs:
         with:
           gradle-version: "8.7"
 
-      # Une seule clé de signature, créée à la première fabrication puis conservée dans le dépôt :
-      # sans elle, chaque nouvelle fabrication aurait une signature différente et Android refuserait
-      # de mettre l'application à jour (il faudrait la désinstaller). Gardez ce dépôt PRIVÉ.
+      # Diagnostic : vérifie quels dépôts sont joignables depuis le runner
+      - name: Tester l'accès aux dépôts Maven
+        shell: bash
+        run: |
+          for u in \
+            https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/1.9.22/kotlin-stdlib-1.9.22.pom \
+            https://maven-central.storage-download.googleapis.com/maven2/org/jetbrains/kotlin/kotlin-stdlib/1.9.22/kotlin-stdlib-1.9.22.pom \
+            https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/8.5.2/gradle-8.5.2.pom \
+            https://plugins.gradle.org/m2/org/jetbrains/kotlin/kotlin-gradle-plugin/1.9.24/kotlin-gradle-plugin-1.9.24.pom ; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$u" || true)
+            echo "$code  $u"
+          done
+
       - name: Créer la clé de signature (première fois seulement)
         shell: bash
         run: |
@@ -50,11 +60,22 @@ jobs:
             git push
           fi
 
-      - name: Compiler l'APK
+      - name: Compiler l'APK (3 essais en cas d'erreur réseau)
         working-directory: android
         env:
           SERVER_URL: ${{ inputs.server_url }}
-        run: gradle --no-daemon assembleRelease -PserverUrl="$SERVER_URL" -PversionCode=${{ github.run_number }}
+        shell: bash
+        run: |
+          for i in 1 2 3; do
+            if gradle --no-daemon assembleRelease \
+                 -PserverUrl="$SERVER_URL" \
+                 -PversionCode=${{ github.run_number }}; then
+              exit 0
+            fi
+            echo "Essai $i échoué, nouvelle tentative dans 20 s..."
+            sleep 20
+          done
+          exit 1
 
       - name: Préparer SuricateTracker.apk
         shell: bash
@@ -70,7 +91,7 @@ jobs:
           path: installers/SuricateTracker.apk
           if-no-files-found: error
 
-      - name: Ajouter l'APK au dépôt (le serveur le propose pour le téléchargement)
+      - name: Ajouter l'APK au dépôt
         if: ${{ inputs.publish_to_repo }}
         shell: bash
         run: |
@@ -81,5 +102,6 @@ jobs:
             echo "APK identique : rien à publier."
           else
             git commit -m "Application Android (fabriquée par GitHub Actions)"
+            git pull --rebase
             git push
           fi
