@@ -50,6 +50,7 @@ Cliquez sur un client : une trajectoire violette, fléchée dans le sens serveur
 (boussole) affichés sur la ligne et dans le panneau de gauche. Le bouton **↔ Voir les deux** cadre la carte sur les deux points.
 
 - Case **📍 Position du serveur (ce navigateur)** : décochez pour masquer et arrêter la localisation (choix mémorisé dans le navigateur).
+- Bouton **🔄 Relocaliser** : relance la recherche de position. En cas de « délai dépassé », la page réessaie seule toutes les 8 s ; quand on décoche puis recoche la case, la dernière position connue est réaffichée tout de suite, le temps de l'actualiser.
 - Cette position n'est **jamais envoyée au serveur** : elle reste dans la page.
 - Sans autorisation ou sans GPS (PC), la précision peut être faible (position par Wi-Fi ou IP) : le panneau l'indique.
 - La trajectoire est une ligne droite, pas un itinéraire routier (un calcul d'itinéraire enverrait les positions à un service externe).
