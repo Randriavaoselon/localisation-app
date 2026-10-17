@@ -15,7 +15,7 @@ on:
         default: true
 
 permissions:
-  contents: write   # nécessaire pour ajouter installers/SuricateTracker-Setup.exe au dépôt
+  contents: write # nécessaire pour ajouter installers/SuricateTracker-Setup.exe au dépôt
 
 jobs:
   build:
@@ -25,7 +25,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"   # inclut tkinter, nécessaire à la fenêtre de configuration
+          python-version: "3.12" # inclut tkinter, nécessaire à la fenêtre de configuration
 
       - name: Installer Inno Setup
         shell: pwsh
