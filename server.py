@@ -459,7 +459,8 @@ def api_client_enroll(cid):
     db.commit()
     return jsonify(code=code, expires_in_s=ENROLL_MINUTES * 60,
                    download_url="/download/windows?code=" + code,
-                   installer_available=os.path.isfile(INSTALLER_PATH))
+                   installer_available=os.path.isfile(INSTALLER_PATH),
+                   android_available=os.path.isfile(ANDROID_APK_PATH))
 
 
 @app.get("/download/windows")
@@ -517,6 +518,320 @@ def favicon():
     if not os.path.isfile(path):
         return "", 404
     return send_file(path, mimetype="image/png", max_age=86400)
+
+# --------------------------------------------------------------------------
+# Client Android : page web installable (PWA) servie par ce serveur
+# --------------------------------------------------------------------------
+ANDROID_MANIFEST = {
+    "name": "Suricate Tracker", "short_name": "Suricate", "lang": "fr",
+    "description": "Client de suivi de position pour Android",
+    "start_url": "/android/", "scope": "/android/", "display": "standalone",
+    "orientation": "portrait", "background_color": "#0b1220", "theme_color": "#0b6bcb",
+    "icons": [
+        {"src": "/android/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+        {"src": "/android/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    ],
+}
+
+ANDROID_SW = """// Service worker minimal : nécessaire pour que le navigateur propose « Installer l'application ».
+// Rien n'est mis en cache : la page a besoin du serveur pour fonctionner.
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", e => e.waitUntil(self.clients.claim()));
+self.addEventListener("fetch", () => {});
+"""
+
+
+ANDROID_APK_PATH = os.getenv("ANDROID_APK_PATH") or os.path.join(_HERE, "installers", "SuricateTracker.apk")
+
+
+@app.get("/download/android")
+def download_android():
+    """Application Android (APK fabriqué par GitHub Actions). Elle ne contient aucun secret (seulement l'adresse
+    du serveur) : téléchargeable sans connexion, directement depuis le téléphone."""
+    if not os.path.isfile(ANDROID_APK_PATH):
+        return jsonify(error="application Android non publiée sur ce serveur"), 404
+    return send_file(ANDROID_APK_PATH, as_attachment=True, download_name="SuricateTracker.apk",
+                     mimetype="application/vnd.android.package-archive")
+
+
+@app.get("/android/")
+def android_page():
+    return Response(ANDROID_PAGE, mimetype="text/html")
+
+
+@app.get("/android/manifest.webmanifest")
+def android_manifest():
+    return Response(json.dumps(ANDROID_MANIFEST), mimetype="application/manifest+json")
+
+
+@app.get("/android/sw.js")
+def android_sw():
+    resp = Response(ANDROID_SW, mimetype="application/javascript")
+    resp.headers["Service-Worker-Allowed"] = "/android/"
+    return resp
+
+
+@app.get("/android/icon-<int:size>.png")
+def android_icon(size):
+    if size not in (192, 512):
+        return "", 404
+    path = os.path.join(_HERE, "assets", f"icon-{size}.png")
+    if not os.path.isfile(path):                      # repli : l'icône principale
+        path = os.path.join(_HERE, "assets", "favicon.png")
+    if not os.path.isfile(path):
+        return "", 404
+    return send_file(path, mimetype="image/png", max_age=86400)
+
+
+ANDROID_PAGE = r"""<!DOCTYPE html>
+<html lang="fr"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Suricate Tracker · Android</title>
+<link rel="manifest" href="/android/manifest.webmanifest">
+<link rel="icon" type="image/png" href="/favicon.png?v=1">
+<link rel="apple-touch-icon" href="/android/icon-192.png">
+<meta name="theme-color" content="#0b6bcb">
+<style>
+ :root{color-scheme:light dark;--bg:#f4f6fa;--card:#fff;--fg:#14202e;--mut:#5d6b7a;--acc:#0b6bcb;--ok:#1a8f4c;--ko:#c0392b;--line:#dde3ea}
+ @media (prefers-color-scheme:dark){:root{--bg:#0b1220;--card:#131d2e;--fg:#e8eef6;--mut:#93a3b5;--acc:#2f81d8;--ok:#3ddc84;--ko:#ff6b5e;--line:#243247}}
+ *{box-sizing:border-box}
+ body{margin:0;font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--fg);
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+ main{max-width:520px;margin:0 auto;padding:16px}
+ h1{font-size:20px;margin:6px 0 14px;display:flex;align-items:center;gap:10px}
+ h1 img{width:32px;height:32px;border-radius:8px}
+ .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+ .state{font-size:19px;font-weight:700;margin:0 0 6px}
+ .row{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:14px}
+ .row span:first-child{color:var(--mut)}
+ .row span:last-child{text-align:right;word-break:break-word}
+ input{width:100%;font:600 20px ui-monospace,monospace;letter-spacing:2px;text-transform:uppercase;text-align:center;
+  padding:12px;border:1px solid var(--line);border-radius:10px;background:transparent;color:var(--fg)}
+ button{width:100%;font:600 16px system-ui,sans-serif;padding:13px;border-radius:10px;border:1px solid var(--line);
+  background:var(--card);color:var(--fg);margin-top:10px}
+ button.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+ button.danger{color:var(--ko)}
+ button:disabled{opacity:.6}
+ .msg{color:var(--ko);font-size:14px;min-height:20px;margin-top:8px}
+ .note{color:var(--mut);font-size:13px;margin:6px 0}
+ [hidden]{display:none !important}
+</style></head><body>
+<main>
+ <h1><img src="/favicon.png?v=1" alt=""> Suricate Tracker <small class="note">Android</small></h1>
+
+ <section id="enroll" class="card" hidden>
+  <p class="state">Activer ce téléphone</p>
+  <p class="note">Sur le tableau de bord, créez un client pour ce téléphone, cliquez sur « 📱 Android », puis saisissez ici le code d'activation (ou ouvrez le lien proposé).</p>
+  <input id="code" maxlength="14" placeholder="XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text">
+  <button id="enrollBtn" class="primary" type="button">Activer</button>
+  <div id="enrollMsg" class="msg"></div>
+ </section>
+
+ <section id="main" hidden>
+  <div class="card">
+   <p class="state" id="state">…</p>
+   <p class="note" id="hint"></p>
+   <div class="row"><span>Client</span><span id="cname">–</span></div>
+   <div class="row"><span>Position</span><span id="pos">–</span></div>
+   <div class="row"><span>Précision</span><span id="acc">–</span></div>
+   <div class="row"><span>Dernier envoi</span><span id="sent">–</span></div>
+   <div class="row"><span>Positions envoyées</span><span id="count">0</span></div>
+   <div class="row"><span>Écran gardé allumé</span><span id="wake">–</span></div>
+   <div class="msg" id="err"></div>
+  </div>
+  <button id="install" type="button" hidden>📲 Installer l'application</button>
+  <p class="note">Gardez cette page ouverte : Android suspend le suivi quand l'écran s'éteint ou quand vous changez d'application. Le suivi se démarre et s'arrête depuis le tableau de bord (▶ / ⏹). Pour installer : menu ⋮ du navigateur, puis « Installer l'application ».</p>
+  <button id="forget" class="danger" type="button">Oublier ce client sur ce téléphone</button>
+ </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const KEY = "suricate_android";
+const APPROX_M = 2000;
+let cfg = null;                       // {token, name} : enregistré dans ce navigateur
+let desired = "stopped", interval = 30, pollEvery = 10;
+let watchId = null, last = null, lastSent = 0, sentCount = 0, lastErr = "", netErr = "";
+let busy = false, wakeLock = null, pollTimer = null, deferredInstall = null;
+
+function load() { try { cfg = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { cfg = null; } }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} }
+function wipe() { cfg = null; try { localStorage.removeItem(KEY); } catch (e) {} }
+function authHeaders(extra) { return Object.assign({"Authorization": "Bearer " + cfg.token}, extra || {}); }
+function errText(e) {
+  if (e && e.code === 1) return "Localisation refusée : autorisez-la pour ce site (cadenas de la barre d'adresse), puis rechargez la page.";
+  if (e && e.code === 2) return "Position indisponible (activez le GPS / la localisation du téléphone).";
+  if (e && e.code === 3) return "Délai dépassé pour obtenir la position (essayez à l'extérieur ou près d'une fenêtre).";
+  return (e && e.message) || "erreur";
+}
+function toPos(p) {
+  const c = p.coords;
+  return {lat: c.latitude, lon: c.longitude, acc: c.accuracy, alt: c.altitude, altAcc: c.altitudeAccuracy, t: p.timestamp || Date.now()};
+}
+function ago(ms) {
+  const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
+  return s < 60 ? "il y a " + s + " s" : "il y a " + Math.floor(s / 60) + " min";
+}
+
+/* ---------- activation (code à usage unique -> jeton) ---------- */
+async function doEnroll() {
+  const code = $("code").value.trim();
+  $("enrollMsg").textContent = ""; $("enrollBtn").disabled = true;
+  try {
+    const r = await fetch("/api/agent/enroll", {method: "POST", headers: {"Content-Type": "application/json"},
+                                                body: JSON.stringify({code: code})});
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || ("erreur " + r.status));
+    cfg = {token: j.token, name: j.name}; save();
+    startApp();
+  } catch (e) { $("enrollMsg").textContent = "⚠️ " + e.message; }
+  $("enrollBtn").disabled = false; render();
+}
+$("enrollBtn").onclick = doEnroll;
+$("code").oninput = e => {
+  const raw = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12);
+  e.target.value = raw.replace(/(.{4})(?=.)/g, "$1-");
+};
+$("code").onkeydown = e => { if (e.key === "Enter") doEnroll(); };
+$("forget").onclick = () => {
+  if (!confirm("Oublier ce client sur ce téléphone ? Il faudra un nouveau code pour le réactiver.")) return;
+  stopTracking(); wipe(); desired = "stopped"; last = null; sentCount = 0; lastSent = 0; clearTimeout(pollTimer); render();
+};
+function invalid() {
+  stopTracking(); wipe(); desired = "stopped"; clearTimeout(pollTimer);
+  $("enrollMsg").textContent = "⚠️ Ce client n'est plus valide (jeton remplacé ou client supprimé). Activez-le de nouveau avec un nouveau code.";
+  render();
+}
+
+/* ---------- consigne du serveur : suivre ou attendre ---------- */
+async function poll() {
+  if (!cfg) return;
+  try {
+    const r = await fetch("/api/agent/poll", {headers: authHeaders(), cache: "no-store"});
+    if (r.status === 401) { invalid(); return; }
+    const j = await r.json();
+    netErr = "";
+    interval = Math.max(10, j.interval || 30); pollEvery = Math.max(5, j.poll || 10);
+    if (j.name && j.name !== cfg.name) { cfg.name = j.name; save(); }
+    setDesired(j.desired);
+  } catch (e) { netErr = "Impossible de joindre le serveur : nouvel essai automatique."; }
+  render();
+  clearTimeout(pollTimer); pollTimer = setTimeout(poll, pollEvery * 1000);
+}
+function setDesired(d) {
+  if (d === desired) return;
+  desired = d;
+  if (d === "running") startTracking(); else stopTracking();
+}
+
+/* ---------- suivi GPS + envoi périodique ---------- */
+function startWatch() {
+  if (!navigator.geolocation) { lastErr = "Localisation non disponible dans ce navigateur."; return; }
+  if (watchId !== null) return;
+  watchId = navigator.geolocation.watchPosition(
+    p => { last = toPos(p); lastErr = ""; render(); },
+    e => { lastErr = errText(e); render(); },
+    {enableHighAccuracy: true, maximumAge: 0, timeout: 60000});
+}
+function stopWatch() {
+  if (watchId !== null && navigator.geolocation) navigator.geolocation.clearWatch(watchId);
+  watchId = null;
+}
+async function lockScreen() {
+  if (!("wakeLock" in navigator) || wakeLock) return;
+  try {
+    wakeLock = await navigator.wakeLock.request("screen");
+    wakeLock.addEventListener("release", () => { wakeLock = null; render(); });
+  } catch (e) { wakeLock = null; }
+  render();
+}
+function unlockScreen() { if (wakeLock) { try { wakeLock.release(); } catch (e) {} } wakeLock = null; }
+function startTracking() { startWatch(); lockScreen(); setTimeout(tick, 1500); }
+function stopTracking() { stopWatch(); unlockScreen(); }
+function freshPosition() {
+  return new Promise((res, rej) => navigator.geolocation.getCurrentPosition(
+    p => { last = toPos(p); res(last); }, rej, {enableHighAccuracy: true, maximumAge: 0, timeout: 25000}));
+}
+async function sendPosition(p) {
+  const body = {
+    position: {lat: p.lat, lon: p.lon, accuracy_m: p.acc, altitude: p.alt, altitude_accuracy: p.altAcc,
+               method: "Android · GPS du navigateur", approx: p.acc > APPROX_M},
+    client_time: new Date(p.t).toISOString()
+  };
+  const r = await fetch("/api/agent/report", {method: "POST", headers: authHeaders({"Content-Type": "application/json"}),
+                                              body: JSON.stringify(body)});
+  if (r.status === 401) { invalid(); return; }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || ("erreur " + r.status));
+  netErr = ""; lastErr = ""; lastSent = Date.now();
+  if (j.stored) sentCount++;
+  if (j.desired && j.desired !== "running") setDesired(j.desired);   // arrêt demandé depuis le tableau de bord
+}
+async function tick() {
+  if (!cfg || desired !== "running" || busy) return;
+  if (Date.now() - lastSent < interval * 1000 - 1000) return;
+  busy = true;
+  try {
+    const p = last && Date.now() - last.t < interval * 2000 ? last : await freshPosition();
+    if (p) await sendPosition(p);
+  } catch (e) {
+    if (e instanceof TypeError) netErr = "Impossible de joindre le serveur : nouvel essai automatique.";
+    else lastErr = errText(e);
+  }
+  busy = false; render();
+}
+setInterval(tick, 5000);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && cfg && desired === "running") { startWatch(); lockScreen(); tick(); }
+  render();
+});
+
+/* ---------- affichage ---------- */
+function render() {
+  const enrolled = !!cfg;
+  $("enroll").hidden = enrolled; $("main").hidden = !enrolled;
+  if (!enrolled) return;
+  let s, h = "";
+  if (netErr) { s = "🔴 Serveur injoignable"; h = netErr; }
+  else if (desired === "running") { s = last ? "🟢 Suivi actif" : "🟡 Suivi actif · recherche de la position…"; }
+  else { s = "⏸ Suivi arrêté"; h = "En attente de ▶ Démarrer sur le tableau de bord."; }
+  if (document.hidden && desired === "running") h = "Page en arrière-plan : le suivi est suspendu par Android.";
+  $("state").textContent = s; $("hint").textContent = h;
+  $("cname").textContent = cfg.name || "–";
+  $("pos").textContent = last ? last.lat.toFixed(5) + ", " + last.lon.toFixed(5) : "–";
+  $("acc").textContent = last ? "±" + Math.round(last.acc) + " m" + (last.acc > APPROX_M ? " (approximative)" : "") : "–";
+  $("sent").textContent = lastSent ? ago(lastSent) : "–";
+  $("count").textContent = String(sentCount);
+  $("wake").textContent = wakeLock ? "oui" : ("wakeLock" in navigator ? (desired === "running" ? "non" : "–") : "non pris en charge");
+  $("err").textContent = lastErr;
+}
+setInterval(render, 1000);
+
+/* ---------- installation de l'application ---------- */
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); deferredInstall = e; $("install").hidden = false; });
+$("install").onclick = async () => {
+  if (!deferredInstall) return;
+  deferredInstall.prompt();
+  try { await deferredInstall.userChoice; } catch (e) {}
+  deferredInstall = null; $("install").hidden = true;
+};
+window.addEventListener("appinstalled", () => { $("install").hidden = true; });
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/android/sw.js", {scope: "/android/"}).catch(() => {});
+
+function startApp() { render(); poll(); }
+(function init() {
+  load();
+  const m = /[#&]code=([A-Za-z0-9-]{8,20})/.exec(location.hash);
+  if (m) {                                  // lien du tableau de bord : activation automatique
+    $("code").value = m[1].toUpperCase();
+    history.replaceState(null, "", location.pathname);
+    doEnroll();
+  } else if (cfg) startApp();
+  render();
+})();
+</script></body></html>
+"""
+
 
 @app.delete("/api/clients/<int:cid>")
 @api_user
@@ -1128,6 +1443,39 @@ async function windowsInstall(c) {
     modalButtons(box, [btn("Fermer", closeModal, true)]);
   });
 }
+async function androidInstall(c) {
+  let j;
+  try { j = await api("/api/clients/" + c.id + "/enroll", "POST", {}); }
+  catch (e) { alert(e.message); return; }
+  const apk = location.origin + "/download/android";
+  const deep = "suricate://enroll?server=" + encodeURIComponent(location.origin) + "&code=" + j.code;
+  showModal(box => {
+    box.appendChild(el("h2", "📱 Installer « " + c.name + " » sur Android"));
+    if (j.android_available) {
+      box.appendChild(el("p", "1. Sur le téléphone, ouvrez ce lien dans Chrome pour télécharger l'application. " +
+        "Android demandera d'autoriser l'installation d'applications depuis ce navigateur : acceptez.", "note"));
+      box.appendChild(el("pre", apk));
+      const a = el("a", "⬇ Télécharger SuricateTracker.apk", "dl"); a.href = "/download/android";
+      box.appendChild(a);
+    } else {
+      box.appendChild(el("p", "L'application Android n'est pas encore publiée sur ce serveur (README : onglet Actions de GitHub > " +
+        "« Fabriquer l'application Android (APK) », puis git pull et Reload sur le serveur).", "note"));
+    }
+    box.appendChild(el("p", "2. Ouvrez « Suricate » et saisissez ce code d'activation (l'adresse du serveur est déjà remplie) :", "note"));
+    box.appendChild(el("pre", j.code));
+    const dl = el("a", "Ou, depuis le téléphone : ouvrir Suricate avec le code déjà saisi", "dl"); dl.href = deep;
+    box.appendChild(dl);
+    box.appendChild(el("p", "3. L'application demande ensuite : position précise, notifications, « Toujours autoriser », " +
+      "activation du GPS et batterie. Acceptez tout : le GPS doit rester allumé, et le suivi redémarre alors tout seul " +
+      "à chaque démarrage du téléphone (en arrière-plan, avec la notification « Suivi actif »). " +
+      "Le suivi se lance avec ▶ Démarrer sur ce tableau de bord.", "note"));
+    box.appendChild(el("p", "Le code est valable " + Math.round(j.expires_in_s / 60) + " minutes et ne sert qu'une fois. " +
+      "L'enregistrement remplace le jeton précédent de ce client : un client = un appareil, créez un client dédié au téléphone. " +
+      "Secours sans installation (limité : écran allumé, page ouverte) : " + location.origin + "/android/#code=" + j.code, "note"));
+    const copy = btn("Copier le lien de l'application", () => copyText(apk, copy));
+    modalButtons(box, [copy, btn("Fermer", closeModal, true)]);
+  });
+}
 function showCredentials(id, name, token, isNew) {
   const cmd = linuxCommand("--token " + token);
   showModal(box => {
@@ -1140,6 +1488,7 @@ function showCredentials(id, name, token, isNew) {
       "obéit aux boutons ▶ Démarrer / ⏹ Arrêter du tableau de bord.", "note"));
     const copy = btn("Copier la commande", () => copyText(cmd, copy));
     modalButtons(box, [copy, btn("💻 Windows", () => windowsInstall({id, name})),
+                       btn("📱 Android", () => androidInstall({id, name})),
                        btn("Fermer", closeModal, true)]);
   });
 }
@@ -1278,7 +1627,7 @@ function select(c) {
 /* ---------- Clients (liste, commandes, positions actuelles) ---------- */
 function agentLine(c) {
   if (!c.agent_online) return c.desired === "running"
-    ? "⚪ client non connecté (installez le client sur l'appareil : bouton 🐧 Linux ou 💻 Windows)" : "⚪ client non connecté · suivi arrêté";
+    ? "⚪ client non connecté (installez le client sur l'appareil : bouton 🐧 Linux, 💻 Windows ou 📱 Android)" : "⚪ client non connecté · suivi arrêté";
   return c.desired === "running" ? "🟢 client connecté · suivi actif" : "⏸ client connecté · suivi arrêté";
 }
 async function command(c, action) {
@@ -1343,6 +1692,7 @@ async function refresh() {
         : actionButton("▶ Démarrer", "Démarrer le suivi à distance", () => command(c, "start")),
       actionButton("🐧 Linux", "Installer ce client sur Linux", () => linuxInstall(c)),
       actionButton("💻 Windows", "Installer ce client sur Windows", () => windowsInstall(c)),
+      actionButton("📱 Android", "Installer ce client sur Android", () => androidInstall(c)),
       actionButton("🔑 Jeton", "Générer un nouveau jeton", () => regenToken(c)),
       actionButton("🗑", "Supprimer ce client", () => removeClient(c)));
     li.appendChild(acts);

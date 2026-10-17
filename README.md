@@ -55,6 +55,34 @@ Cliquez sur un client : une trajectoire violette, fléchée dans le sens serveur
 - Sans autorisation ou sans GPS (PC), la précision peut être faible (position par Wi-Fi ou IP) : le panneau l'indique.
 - La trajectoire est une ligne droite, pas un itinéraire routier (un calcul d'itinéraire enverrait les positions à un service externe).
 
+## Client Android (application)
+
+Une vraie application Android (dossier `android/`, fabriquée par GitHub Actions comme l'installateur Windows) : elle suit en arrière-plan, écran éteint, et **redémarre toute seule à chaque démarrage du téléphone**. Elle utilise le même protocole que les clients Linux et Windows (`/api/agent/poll` et `/api/agent/report`).
+
+**Fabriquer l'APK (une fois, puis à chaque changement du code Android ou de l'adresse du serveur)**
+
+1. Sur GitHub : onglet **Actions** > **Fabriquer l'application Android (APK)** > **Run workflow**, avec l'adresse de votre serveur (ex. `https://selonmoc.pythonanywhere.com`), « Ajouter l'APK au dépôt » coché. Compter 4 à 8 minutes.
+2. La première fois, le workflow crée une clé de signature (`android/suricate.keystore`) et la range dans le dépôt : elle sert à pouvoir mettre l'application à jour sans la désinstaller. **Gardez le dépôt privé.**
+3. Sur le serveur : `git pull` puis **Reload**. L'APK (`installers/SuricateTracker.apk`) est alors proposé par le tableau de bord.
+
+**Installer sur le téléphone**
+
+1. Sur le tableau de bord, créez un client dédié au téléphone (ex. `Téléphone-Alice`) puis cliquez sur **📱 Android** : un lien de téléchargement et un code d'activation (30 minutes, usage unique) s'affichent.
+2. Sur le téléphone, ouvrez le lien dans Chrome, téléchargez l'APK et installez-le (Android demande d'autoriser « Installer des applications inconnues » pour Chrome).
+3. Ouvrez **Suricate**, saisissez le code (l'adresse du serveur est déjà remplie) et touchez **Activer**.
+4. L'application demande, dans l'ordre : la position précise, les notifications, **« Toujours autoriser »** la position, l'activation du **GPS**, puis l'exemption d'optimisation de batterie. Acceptez tout.
+5. Le suivi se démarre et s'arrête avec **▶ Démarrer / ⏹ Arrêter** sur le tableau de bord.
+
+**Ce que fait l'application**
+
+- Android interdit à une application d'allumer le GPS en silence. Suricate affiche donc, à chaque ouverture tant que le GPS est éteint, une fenêtre non fermable qui mène directement aux réglages de localisation ; et la notification permanente indique « GPS désactivé : touchez pour l'activer ». Une fois le GPS allumé, il n'y a plus rien à refaire.
+- Au démarrage du téléphone (et après une mise à jour de l'application), un service de premier plan démarre seul, sans ouvrir l'écran : une notification « Suivi actif » apparaît. Il faut que l'application ait été ouverte au moins une fois depuis l'installation, et que « Toujours autoriser » ait été accordé.
+- Certains téléphones (Xiaomi, Tecno, Infinix, Huawei, Oppo, Samsung en mode économie…) coupent les applications en arrière-plan malgré tout : ouvrez les réglages de l'application et activez « Démarrage automatique » / « Aucune restriction » pour la batterie.
+- Les positions contiennent coordonnées, précision, altitude et la méthode (GPS ou réseau). Le nom du Wi-Fi n'est pas transmis. L'adresse du serveur doit être en `https://`.
+- Mise à jour : relancez le workflow, téléchargez de nouveau l'APK sur le téléphone et installez-le par-dessus (la clé de signature étant conservée, rien n'est perdu).
+
+**Secours sans installation** : la page `/android/` (PWA) fonctionne dans Chrome, mais seulement écran allumé et page ouverte ; elle ne démarre pas seule et ne peut pas activer le GPS.
+
 ## Installer le client sur Linux (commande `suricate-tracker`, utilisable de partout)
 
 Plus besoin d'être dans le dossier du projet : l'installateur copie le client dans `~/.local/share/suricate-tracker/`
