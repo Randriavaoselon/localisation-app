@@ -42,6 +42,18 @@ Cliquez sur un client dans la liste : le panneau **Trajectoire** s'ouvre.
 Pour une position précise, laissez ouverte la page locale que le client ouvre au démarrage (le navigateur
 fournit la position). Sans elle, le client utilise les routeurs voisins, puis l'IP.
 
+## Position du serveur et trajectoire vers le client
+
+À l'ouverture du tableau de bord, le navigateur demande l'autorisation de localisation (HTTPS requis, sauf en local).
+La position du serveur (celle du navigateur qui affiche le tableau de bord) apparaît sur la carte (marqueur violet **Moi** + cercle de précision) et se met à jour si vous vous déplacez.
+Cliquez sur un client : une trajectoire violette, fléchée dans le sens serveur → client, relie les deux positions, avec la **distance en ligne droite** et le **cap**
+(boussole) affichés sur la ligne et dans le panneau de gauche. Le bouton **↔ Voir les deux** cadre la carte sur les deux points.
+
+- Case **📍 Position du serveur (ce navigateur)** : décochez pour masquer et arrêter la localisation (choix mémorisé dans le navigateur).
+- Cette position n'est **jamais envoyée au serveur** : elle reste dans la page.
+- Sans autorisation ou sans GPS (PC), la précision peut être faible (position par Wi-Fi ou IP) : le panneau l'indique.
+- La trajectoire est une ligne droite, pas un itinéraire routier (un calcul d'itinéraire enverrait les positions à un service externe).
+
 ## Installer le client sur Linux (commande `suricate-tracker`, utilisable de partout)
 
 Plus besoin d'être dans le dossier du projet : l'installateur copie le client dans `~/.local/share/suricate-tracker/`

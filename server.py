@@ -842,6 +842,15 @@ DASHBOARD = r"""<!DOCTYPE html>
  #modalbox .row button.primary{border:0;background:#0b6bcb}
  .err{color:#c0392b;font-size:13px;min-height:16px;margin-top:8px}
  .note{color:#555;font-size:13px}
+ #mebox{padding:8px 14px;border-bottom:1px solid #eee;font-size:12px}
+ #mebox label{font-weight:600;color:#5b2c6f}
+ #mestatus{color:#666;margin-top:3px}
+ #melink{color:#5b2c6f;margin-top:3px}
+ #fitBoth{margin-top:5px;border:1px solid #ccd;background:#fff;border-radius:4px;cursor:pointer;padding:2px 8px;font-size:12px}
+ #fitBoth[hidden]{display:none}
+ .stop.me{background:#8e44ad;width:30px;height:30px;font-size:11px}
+ .linklabel{background:#fff;border:1px solid #8e44ad;border-radius:10px;font:600 11px system-ui,sans-serif;
+  text-align:center;padding:1px 6px;white-space:nowrap;color:#5b2c6f;width:fit-content;margin:0 auto}
  @media (max-width:700px){#side{width:100%;height:52%;bottom:auto}#map{left:0;top:52%}}
 </style></head><body>
 <div id="side">
@@ -851,6 +860,12 @@ DASHBOARD = r"""<!DOCTYPE html>
   </div>
   <div id="status">Chargement…</div>
   <div id="bar"><button class="primary" id="newbtn" type="button">➕ Nouveau client</button></div>
+  <div id="mebox">
+    <label><input type="checkbox" id="meToggle" checked> 📍 Position du serveur (ce navigateur)</label>
+    <div id="mestatus"></div>
+    <div id="melink"></div>
+    <button id="fitBoth" type="button" hidden>↔ Voir les deux sur la carte</button>
+  </div>
   <ul id="list"></ul>
   <div id="traj" hidden>
     <div class="trajhead"><b id="trajtitle"></b><button id="trajclose" title="Fermer">✕</button></div>
@@ -943,6 +958,83 @@ function details(c) {
   if (c.approx) box.appendChild(el("div", "⚠️ Position approximative (IP ou imprécise) : à confirmer", "warn"));
   return box;
 }
+
+/* ---------- Ma position (navigateur du tableau de bord) et ligne vers le client ---------- */
+/* La position du navigateur reste dans cette page : elle n'est jamais envoyée au serveur. */
+let myPos = null, myMarker = null, myRing = null, watchId = null, showMe = true;
+const linkLayer = L.layerGroup().addTo(map);
+try { showMe = localStorage.getItem("showMe") !== "0"; } catch (e) {}
+$("meToggle").checked = showMe;
+
+function compass(deg) { return ["N", "NE", "E", "SE", "S", "SO", "O", "NO"][Math.round(deg / 45) % 8]; }
+function meMsg(t) { $("mestatus").textContent = t; }
+function onMePos(p) {
+  myPos = {lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy || 0};
+  const ll = [myPos.lat, myPos.lon];
+  if (!myMarker) {
+    const icon = L.divIcon({html: el("div", "Moi", "stop me"), className: "", iconSize: [30, 30], iconAnchor: [15, 15]});
+    myMarker = L.marker(ll, {icon: icon, zIndexOffset: 2000})
+      .bindTooltip(el("span", "Position du serveur (navigateur du tableau de bord)")).addTo(map);
+    myRing = L.circle(ll, {weight: 1, color: "#8e44ad", fillOpacity: .08}).addTo(map);
+  }
+  myMarker.setLatLng(ll);
+  myRing.setLatLng(ll).setRadius(myPos.acc || 50);
+  meMsg("Position trouvée · précision ±" + Math.round(myPos.acc) + " m" + (myPos.acc > 1000 ? " (approximative)" : ""));
+  updateLink();
+}
+function onMeErr(e) {
+  const why = {1: "autorisation de localisation refusée dans le navigateur", 2: "position indisponible",
+               3: "délai dépassé"}[e.code] || e.message;
+  meMsg("⚠️ Position du serveur : " + why);
+}
+function startMe() {
+  if (watchId !== null) return;
+  if (!navigator.geolocation) { meMsg("⚠️ Localisation non disponible dans ce navigateur."); return; }
+  meMsg("Recherche de votre position…");
+  watchId = navigator.geolocation.watchPosition(onMePos, onMeErr,
+    {enableHighAccuracy: true, maximumAge: 10000, timeout: 30000});
+}
+function stopMe() {
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  watchId = null; myPos = null;
+  if (myMarker) { myMarker.remove(); myRing.remove(); myMarker = myRing = null; }
+  meMsg("Position du serveur masquée.");
+  updateLink();
+}
+function updateLink() {
+  linkLayer.clearLayers();
+  const box = $("melink"), fit = $("fitBoth");
+  box.textContent = ""; fit.hidden = true;
+  if (!showMe || !myPos) return;
+  if (selected === null || !layers[selected]) {
+    box.textContent = "Cliquez sur un client pour tracer la trajectoire depuis le serveur.";
+    return;
+  }
+  const a = [myPos.lat, myPos.lon], c = layers[selected].dot.getLatLng(), b = [c.lat, c.lng];
+  const d = map.distance(a, b), br = bearing(a, b);
+  L.polyline([a, b], {color: "#8e44ad", weight: 3, opacity: .85}).addTo(linkLayer);
+  const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  const tip = [a[0] + (b[0] - a[0]) * .75, a[1] + (b[1] - a[1]) * .75];   // flèche : sens serveur → client
+  const arr = el("div", "➤", "arrow"); arr.style.color = "#8e44ad"; arr.style.transform = "rotate(" + (br - 90) + "deg)";
+  L.marker(tip, {icon: L.divIcon({html: arr, className: "", iconSize: [18, 18]}), interactive: false, keyboard: false}).addTo(linkLayer);
+  L.marker(mid, {icon: L.divIcon({html: el("div", fmtDist(d), "linklabel"), className: "",
+                                  iconSize: [80, 20], iconAnchor: [40, 10]}),
+                 interactive: false, keyboard: false}).addTo(linkLayer);
+  box.textContent = "Serveur → " + selectedName + " : " + fmtDist(d) + " en ligne droite, cap " +
+    Math.round(br) + "° (" + compass(br) + ")";
+  fit.hidden = false;
+}
+$("meToggle").onchange = e => {
+  showMe = e.target.checked;
+  try { localStorage.setItem("showMe", showMe ? "1" : "0"); } catch (err) {}
+  if (showMe) startMe(); else stopMe();
+};
+$("fitBoth").onclick = () => {
+  if (!myPos || selected === null || !layers[selected]) return;
+  map.fitBounds(L.latLngBounds([[myPos.lat, myPos.lon], layers[selected].dot.getLatLng()]),
+    {padding: [70, 70], maxZoom: 16});
+};
+if (showMe) startMe(); else meMsg("Position du serveur masquée.");
 
 /* ---------- Fenêtre modale ---------- */
 function showModal(build) {
@@ -1145,6 +1237,7 @@ function select(c) {
   layers[c.id].dot.openPopup();
   lastSig = "";
   drawTrajectory(true, true);
+  updateLink();
   refresh();
 }
 
@@ -1228,12 +1321,13 @@ async function refresh() {
     firstFit = false;
   }
   if (selected !== null) drawTrajectory(false, false);
+  updateLink();
 }
 $("period").onchange = e => { hours = Number(e.target.value); drawTrajectory(true, true); };
 $("trailToggle").onchange = e => { showTrail = e.target.checked; drawTrajectory(true, false); };
 $("pointsToggle").onchange = e => { showPoints = e.target.checked; drawTrajectory(true, false); };
 $("approxToggle").onchange = e => { withApprox = e.target.checked; drawTrajectory(true, true); };
-$("trajclose").onclick = () => { selected = null; lastSig = ""; drawTrajectory(true, false); refresh(); };
+$("trajclose").onclick = () => { selected = null; lastSig = ""; drawTrajectory(true, false); updateLink(); refresh(); };
 refresh();
 setInterval(refresh, 5000);
 </script></body></html>
