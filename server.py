@@ -1029,21 +1029,22 @@ def health():
 # --------------------------------------------------------------------------
 LOGIN_PAGE = r"""<!DOCTYPE html>
 <html lang="fr"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Suricate-tracker · Connexion</title>
    <link rel="icon" type="image/png" href="/favicon.png?v=1">
 <style>
- body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+ body{margin:0;min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;box-sizing:border-box;
+  padding:16px max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));
   font-family:system-ui,sans-serif;background:#f2f5f9;color:#222}
- .card{background:#fff;width:340px;max-width:calc(100% - 32px);padding:24px;border-radius:10px;
+ .card{background:#fff;width:340px;max-width:100%;padding:24px;border-radius:10px;
   box-shadow:0 4px 20px rgba(0,0,0,.12)}
  h1{font-size:20px;margin:0 0 14px}
  .tabs{display:flex;gap:6px;margin-bottom:14px}
- .tabs button{flex:1;padding:8px;border:0;border-bottom:2px solid #ddd;background:none;cursor:pointer;font-size:14px}
+ .tabs button{flex:1;padding:8px;min-height:44px;border:0;border-bottom:2px solid #ddd;background:none;cursor:pointer;font-size:14px}
  .tabs button.on{border-color:#0b6bcb;font-weight:600}
  label{display:block;font-size:13px;margin:10px 0 3px}
- input{width:100%;box-sizing:border-box;padding:9px;font-size:14px;border:1px solid #ccc;border-radius:6px}
- .go{width:100%;margin-top:16px;padding:10px;border:0;border-radius:6px;background:#0b6bcb;color:#fff;
+ input{width:100%;box-sizing:border-box;padding:10px;min-height:44px;font-size:16px;border:1px solid #ccc;border-radius:6px}
+ .go{width:100%;margin-top:16px;padding:10px;min-height:46px;border:0;border-radius:6px;background:#0b6bcb;color:#fff;
   font-size:15px;cursor:pointer}
  .go:disabled{opacity:.6}
  #err{color:#c0392b;font-size:13px;min-height:18px;margin-top:10px}
@@ -1098,15 +1099,20 @@ $("p").onkeydown = e => { if (e.key === "Enter") submit(); };
 
 DASHBOARD = r"""<!DOCTYPE html>
 <html lang="fr"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Suricate-tracker</title>
    <link rel="icon" type="image/png" href="/favicon.png?v=1">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
+ :root{--sidew:clamp(280px,34vw,340px)}
  html,body{height:100%;margin:0;font-family:system-ui,sans-serif;color:#222}
- #side{position:absolute;top:0;bottom:0;left:0;width:340px;background:#fff;z-index:1000;
+ body{overflow:hidden}
+ #side{position:absolute;top:0;bottom:0;left:0;width:var(--sidew);background:#fff;z-index:1000;
   box-shadow:2px 0 10px rgba(0,0,0,.2);display:flex;flex-direction:column}
- #top{display:flex;justify-content:space-between;align-items:center;padding:12px 14px 4px;gap:8px}
+ #sheethead{flex:none;background:#fff}
+ #sheetHandle{display:none;width:100%;height:24px;border:0;background:none;padding:0;cursor:pointer;align-items:center;justify-content:center}
+ #sheetHandle span{width:44px;height:5px;border-radius:3px;background:#c4cad3}
+ #top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;padding:12px 14px 4px;gap:4px 8px}
  #top h1{font-size:16px;margin:0}
  #me{font-size:12px;color:#555;display:flex;align-items:center;gap:6px}
  #me button{border:0;background:#eee;border-radius:4px;cursor:pointer;padding:3px 8px}
@@ -1119,7 +1125,7 @@ DASHBOARD = r"""<!DOCTYPE html>
  #list li:hover,#list li.sel{background:#eef5ff}
  #list .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
  #list small{color:#666;display:block}
- .acts{margin-top:6px;display:flex;gap:6px}
+ .acts{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px}
  .acts button{border:1px solid #ccd;background:#fff;border-radius:4px;cursor:pointer;padding:2px 8px;font-size:12px}
  .acts button:hover{background:#f3f6fb}
  #modalbox a.dl{display:inline-block;background:#0b6bcb;color:#fff;padding:9px 14px;border-radius:6px;
@@ -1142,12 +1148,12 @@ DASHBOARD = r"""<!DOCTYPE html>
  .arrow{color:#0b6bcb;font-size:16px;line-height:18px;width:18px;height:18px;text-align:center;
   text-shadow:0 0 3px #fff}
  .pop div{line-height:1.5}.warn{color:#a15c00;margin-top:4px}
- #map{position:absolute;top:0;bottom:0;left:340px;right:0}
+ #map{position:absolute;top:0;bottom:0;left:var(--sidew);right:0}
  #modal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:3000;display:flex;
   align-items:center;justify-content:center}
  #modal[hidden]{display:none}
- #modalbox{background:#fff;border-radius:10px;padding:20px;width:520px;max-width:calc(100% - 32px);
-  max-height:90%;overflow:auto;font-size:14px}
+ #modalbox{background:#fff;border-radius:10px;padding:20px;width:520px;max-width:calc(100% - 24px);box-sizing:border-box;
+  max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);overflow:auto;font-size:14px}
  #modalbox h2{margin:0 0 10px;font-size:17px}
  #modalbox input{width:100%;box-sizing:border-box;padding:9px;font-size:14px;border:1px solid #ccc;border-radius:6px}
  #modalbox pre{background:#f4f4f4;padding:10px;border-radius:6px;white-space:pre-wrap;word-break:break-all;
@@ -1166,14 +1172,63 @@ DASHBOARD = r"""<!DOCTYPE html>
  .stop.me{background:#8e44ad;width:30px;height:30px;font-size:11px}
  .linklabel{background:#fff;border:1px solid #8e44ad;border-radius:10px;font:600 11px system-ui,sans-serif;
   text-align:center;padding:1px 6px;white-space:nowrap;color:#5b2c6f;width:fit-content;margin:0 auto}
- @media (max-width:700px){#side{width:100%;height:52%;bottom:auto}#map{left:0;top:52%}}
+ /* --- Téléphone (≤ 700 px) : le panneau devient une feuille en bas de l'écran, la carte occupe le haut.
+        La poignée alterne : mi-hauteur > grand > réduit. Tout le panneau défile d'un seul bloc. --- */
+ @media (max-width:700px){
+  :root{--sheet:46%}
+  body.sheet-tall{--sheet:86%}
+  body.sheet-peek{--sheet:calc(104px + env(safe-area-inset-bottom))}
+  #side{top:auto;left:0;right:0;bottom:0;width:100%;height:var(--sheet);overflow-y:auto;overscroll-behavior:contain;
+   -webkit-overflow-scrolling:touch;border-radius:16px 16px 0 0;box-shadow:0 -2px 12px rgba(0,0,0,.28);
+   padding-bottom:env(safe-area-inset-bottom);transition:height .2s ease}
+  body.sheet-peek #side{overflow:hidden}
+  #sheethead{position:sticky;top:0;z-index:5;border-radius:16px 16px 0 0}
+  #sheetHandle{display:flex;height:20px}
+  #sheethead #top{padding:0 14px 2px}
+  #sheethead #status{padding-bottom:4px}
+  #list,#traj{flex:none;overflow:visible}
+  #list{min-height:0}
+  #map{left:0;right:0;top:0;bottom:var(--sheet);transition:bottom .2s ease}
+  #mebox{display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px}
+  #mebox label{flex:1 1 100%}
+  #mestatus,#melink{margin-top:0}
+  #top h1{font-size:15px}
+ }
+ /* --- Téléphone en paysage (large mais peu haut) : panneau latéral qui défile d'un seul bloc --- */
+ @media (min-width:701px) and (max-height:520px){
+  #side{overflow-y:auto;overscroll-behavior:contain}
+  #list,#traj{flex:none;overflow:visible}
+  #side{padding-left:env(safe-area-inset-left)}
+ }
+ /* --- Écrans tactiles : cibles plus grandes, champs à 16 px (évite le zoom automatique d'iOS) --- */
+ @media (pointer:coarse){
+  button.primary{min-height:40px;font-size:14px}
+  #me button{min-height:36px;padding:6px 10px}
+  .acts button{min-height:36px;padding:6px 10px;font-size:13px}
+  #relocBtn,#fitBoth{min-height:36px;padding:6px 10px;font-size:13px}
+  #trajclose{min-height:36px;min-width:40px}
+  #list li{padding:12px 14px}
+  #stops li{padding:10px 4px}
+  input[type=checkbox]{width:18px;height:18px;vertical-align:-3px;margin-right:4px}
+  #traj label,#mebox label{line-height:2}
+  #traj select,#modalbox input{font-size:16px;min-height:40px}
+  #modalbox .row button{min-height:40px}
+ }
+ @media (max-width:520px){
+  #modalbox{padding:16px}
+  #modalbox .row{flex-wrap:wrap}
+  #modalbox .row button{flex:1 1 130px}
+ }
 </style></head><body>
 <div id="side">
-  <div id="top">
-    <h1>📡 Suricate-tracker</h1>
-    <div id="me"><span id="who"></span><button id="logout" type="button">Déconnexion</button></div>
+  <div id="sheethead">
+    <button id="sheetHandle" type="button" title="Agrandir ou réduire le panneau" aria-label="Agrandir ou réduire le panneau"><span></span></button>
+    <div id="top">
+      <h1>📡 Suricate-tracker</h1>
+      <div id="me"><span id="who"></span><button id="logout" type="button">Déconnexion</button></div>
+    </div>
+    <div id="status">Chargement…</div>
   </div>
-  <div id="status">Chargement…</div>
   <div id="bar"><button class="primary" id="newbtn" type="button">➕ Nouveau client</button></div>
   <div id="mebox">
     <label><input type="checkbox" id="meToggle" checked> 📍 Position du serveur (ce navigateur)</label>
@@ -1384,6 +1439,27 @@ $("fitBoth").onclick = () => {
     {padding: [70, 70], maxZoom: 16});
 };
 if (showMe) startMe(); else meMsg("Position du serveur masquée.");
+
+/* ---------- Panneau en feuille (téléphone) ---------- */
+const SHEETS = ["half", "tall", "peek"];
+const NARROW = window.matchMedia("(max-width:700px)");                                   // feuille en bas
+const SCROLLY = window.matchMedia("(max-width:700px), (min-width:701px) and (max-height:520px)");   // panneau qui défile d'un bloc
+let sheet = "half";
+try { const sv = localStorage.getItem("sheet"); if (SHEETS.indexOf(sv) >= 0) sheet = sv; } catch (e) {}
+function applySheet() {
+  document.body.classList.remove("sheet-half", "sheet-tall", "sheet-peek");
+  document.body.classList.add("sheet-" + sheet);
+  try { localStorage.setItem("sheet", sheet); } catch (e) {}
+  setTimeout(() => map.invalidateSize(), 260);     // la carte a changé de taille
+}
+$("sheetHandle").onclick = () => { sheet = SHEETS[(SHEETS.indexOf(sheet) + 1) % SHEETS.length]; applySheet(); };
+function revealTraj() {                             // sur téléphone : amène le panneau de trajectoire en haut de la feuille
+  if (!SCROLLY.matches) return;
+  if (NARROW.matches && sheet === "peek") { sheet = "half"; applySheet(); }
+  const head = $("sheethead"), sticky = getComputedStyle(head).position === "sticky";
+  $("side").scrollTo({top: Math.max(0, $("traj").offsetTop - (sticky ? head.offsetHeight : 0)), behavior: "smooth"});
+}
+applySheet();
 
 /* ---------- Fenêtre modale ---------- */
 function showModal(build) {
@@ -1620,6 +1696,7 @@ function select(c) {
   layers[c.id].dot.openPopup();
   lastSig = "";
   drawTrajectory(true, true);
+  revealTraj();
   updateLink();
   refresh();
 }
@@ -1711,7 +1788,8 @@ $("period").onchange = e => { hours = Number(e.target.value); drawTrajectory(tru
 $("trailToggle").onchange = e => { showTrail = e.target.checked; drawTrajectory(true, false); };
 $("pointsToggle").onchange = e => { showPoints = e.target.checked; drawTrajectory(true, false); };
 $("approxToggle").onchange = e => { withApprox = e.target.checked; drawTrajectory(true, true); };
-$("trajclose").onclick = () => { selected = null; lastSig = ""; drawTrajectory(true, false); updateLink(); refresh(); };
+$("trajclose").onclick = () => { selected = null; lastSig = ""; drawTrajectory(true, false); updateLink(); refresh();
+  if (SCROLLY.matches) $("side").scrollTo({top: 0, behavior: "smooth"}); };
 refresh();
 setInterval(refresh, 5000);
 </script></body></html>

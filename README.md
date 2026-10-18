@@ -55,6 +55,10 @@ Cliquez sur un client : une trajectoire violette, fléchée dans le sens serveur
 - Sans autorisation ou sans GPS (PC), la précision peut être faible (position par Wi-Fi ou IP) : le panneau l'indique.
 - La trajectoire est une ligne droite, pas un itinéraire routier (un calcul d'itinéraire enverrait les positions à un service externe).
 
+## Affichage sur téléphone et tablette
+
+Le tableau de bord s'adapte à la taille de l'écran. Sur téléphone (largeur ≤ 700 px), le panneau devient une **feuille en bas de l'écran** et la carte occupe le haut : la poignée grise en haut de la feuille alterne entre mi-hauteur, grand format (pour lire la liste des étapes) et réduit (carte presque plein écran) ; le choix est mémorisé. Tout le panneau défile d'un seul bloc, et un clic sur un client amène directement le panneau de trajectoire en haut de la feuille. En paysage (écran peu haut), le panneau reste à gauche et défile aussi d'un bloc. Les boutons d'action d'un client passent à la ligne au lieu de déborder, les zones tactiles sont agrandies, et les fenêtres (installation, jeton…) tiennent toujours dans l'écran. La page de connexion est adaptée de la même façon.
+
 ## Client Android (application)
 
 Une vraie application Android (dossier `android/`, fabriquée par GitHub Actions comme l'installateur Windows) : elle suit en arrière-plan, écran éteint, et **redémarre toute seule à chaque démarrage du téléphone**. Elle utilise le même protocole que les clients Linux et Windows (`/api/agent/poll` et `/api/agent/report`).
