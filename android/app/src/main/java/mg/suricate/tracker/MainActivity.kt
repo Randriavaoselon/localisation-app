@@ -220,6 +220,16 @@ class MainActivity : Activity() {
         return lm.isProviderEnabled(LocationManager.GPS_PROVIDER)
     }
 
+    /** Localisation allumée dans les réglages, quel que soit le mode (haute précision, économie de batterie, GPS seul). */
+    private fun locationEnabled(): Boolean {
+        val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        return if (Build.VERSION.SDK_INT >= 28) {
+            lm.isLocationEnabled
+        } else {
+            lm.isProviderEnabled(LocationManager.GPS_PROVIDER) || lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+        }
+    }
+
     private fun flag(key: String) {
         Prefs.putStatus(this) { it.putBoolean(key, true) }
     }
@@ -310,12 +320,12 @@ class MainActivity : Activity() {
             return
         }
 
-        // 4. GPS activé : redemandé à chaque ouverture tant qu'il est éteint
-        if (!gpsEnabled()) {
+        // 4. localisation activée : redemandée à chaque ouverture tant qu'elle est éteinte
+        if (!locationEnabled()) {
             ask(
-                "Activer le GPS",
-                "Le GPS (localisation) de ce téléphone est désactivé. Activez-le, puis revenez à l'application : " +
-                    "le suivi ne peut pas fonctionner sans lui.",
+                "Activer la localisation",
+                "La localisation (GPS) de ce téléphone est désactivée. Activez-la, de préférence en mode " +
+                    "« Haute précision », puis revenez à l'application : le suivi ne peut pas fonctionner sans elle.",
                 "Ouvrir les réglages"
             ) {
                 try {
@@ -369,9 +379,9 @@ class MainActivity : Activity() {
         }
         val desired = Prefs.getString(this, "desired")
         val net = Prefs.getString(this, "net")
-        val gpsOn = gpsEnabled()
+        val locOn = locationEnabled()
         statusTitle.text = when {
-            !gpsOn -> "⚠️ GPS désactivé"
+            !locOn -> "⚠️ Localisation désactivée"
             net.isNotEmpty() -> "🔴 Serveur injoignable"
             desired == "running" -> "🟢 Suivi actif"
             else -> "⏸ Suivi arrêté (en attente de ▶ Démarrer)"
@@ -388,6 +398,9 @@ class MainActivity : Activity() {
         sb.append("Dernier envoi : ").append(if (sentAt == 0L) "–" else ago(sentAt)).append('\n')
         sb.append("Positions envoyées : ").append(Prefs.getInt(this, "count")).append('\n')
         val warn = ArrayList<String>()
+        if (locOn && !gpsEnabled()) {
+            warn.add("Le GPS est coupé (mode « Économie de batterie » ?) : les positions viennent du réseau et sont peu précises. Choisissez « Haute précision » dans les réglages de localisation.")
+        }
         if (Build.VERSION.SDK_INT >= 29 && !has(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
             warn.add("Position « Toujours autoriser » non accordée : le suivi écran éteint et le démarrage automatique peuvent échouer.")
         }

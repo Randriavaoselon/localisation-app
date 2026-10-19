@@ -61,7 +61,7 @@ Le tableau de bord s'adapte à la taille de l'écran. Sur téléphone (largeur �
 
 ## Client Android (application)
 
-Une vraie application Android (dossier `android/`, fabriquée par GitHub Actions comme l'installateur Windows) : elle suit en arrière-plan, écran éteint, et **redémarre toute seule à chaque démarrage du téléphone**. Elle utilise le même protocole que les clients Linux et Windows (`/api/agent/poll` et `/api/agent/report`).
+Une vraie application Android (dossier `android/`, fabriquée par GitHub Actions comme l'installateur Windows ; **Android 7.0 ou plus récent**) : elle suit en arrière-plan, écran éteint, et **redémarre toute seule à chaque démarrage du téléphone**. Elle utilise le même protocole que les clients Linux et Windows (`/api/agent/poll` et `/api/agent/report`).
 
 **Fabriquer l'APK (une fois, puis à chaque changement du code Android ou de l'adresse du serveur)**
 
@@ -82,6 +82,8 @@ Une vraie application Android (dossier `android/`, fabriquée par GitHub Actions
 - Android interdit à une application d'allumer le GPS en silence. Suricate affiche donc, à chaque ouverture tant que le GPS est éteint, une fenêtre non fermable qui mène directement aux réglages de localisation ; et la notification permanente indique « GPS désactivé : touchez pour l'activer ». Une fois le GPS allumé, il n'y a plus rien à refaire.
 - Au démarrage du téléphone (et après une mise à jour de l'application), un service de premier plan démarre seul, sans ouvrir l'écran : une notification « Suivi actif » apparaît. Il faut que l'application ait été ouverte au moins une fois depuis l'installation, et que « Toujours autoriser » ait été accordé.
 - Certains téléphones (Xiaomi, Tecno, Infinix, Huawei, Oppo, Samsung en mode économie…) coupent les applications en arrière-plan malgré tout : ouvrez les réglages de l'application et activez « Démarrage automatique » / « Aucune restriction » pour la batterie.
+- Si Android affiche « L'application n'a pas été installée », vérifiez d'abord la version d'Android (7.0 minimum), puis désinstallez toute ancienne version de Suricate et retéléchargez l'APK depuis le lien du tableau de bord. Si Play Protect bloque l'installation, choisissez « Plus de détails » puis « Installer quand même ».
+- Sur Android 7.0 et 7.1.0, la connexion au serveur échoue si le certificat HTTPS n'est pas reconnu par le téléphone : si la page du tableau de bord s'ouvre sans avertissement dans Chrome sur ce téléphone, l'application pourra aussi s'y connecter.
 - Les positions contiennent coordonnées, précision, altitude et la méthode (GPS ou réseau). Le nom du Wi-Fi n'est pas transmis. L'adresse du serveur doit être en `https://`.
 - Mise à jour : relancez le workflow, téléchargez de nouveau l'APK sur le téléphone et installez-le par-dessus (la clé de signature étant conservée, rien n'est perdu).
 

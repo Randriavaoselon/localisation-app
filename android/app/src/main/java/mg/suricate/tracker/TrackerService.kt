@@ -290,6 +290,11 @@ class TrackerService : Service() {
     // ------------------------------------------------------------------ notification et état affiché
     private fun refreshStatus() {
         val gps = lm.isProviderEnabled(LocationManager.GPS_PROVIDER)
+        val locOn = if (Build.VERSION.SDK_INT >= 28) {
+            lm.isLocationEnabled
+        } else {
+            gps || lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+        }
         val fix = lastFix
         val d = desired
         Prefs.putStatus(this) {
@@ -301,7 +306,8 @@ class TrackerService : Service() {
             }
         }
         val text = when {
-            !gps -> "⚠️ GPS désactivé : touchez pour l'activer"
+            !locOn -> "⚠️ Localisation désactivée : touchez pour l'activer"
+            d == "running" && !gps -> "Suivi actif (position réseau, peu précise) · choisissez « Haute précision »"
             d == "running" -> "Suivi actif · envoi toutes les $interval s"
             else -> "En attente : suivi arrêté depuis le tableau de bord"
         }
