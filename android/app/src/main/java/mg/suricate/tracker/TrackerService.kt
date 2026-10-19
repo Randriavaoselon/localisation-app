@@ -384,8 +384,7 @@ class TrackerService : Service() {
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
             .setVisibility(Notification.VISIBILITY_SECRET)   // contenu masqué sur l'écran de verrouillage
-            .setSilent(true)
-            .build()
+            .build()                                           // le canal IMPORTANCE_MIN (ou PRIORITY_LOW ci-dessus) évite déjà tout son ou vibration
     }
 
     private fun startAsForeground(text: String): Boolean {
