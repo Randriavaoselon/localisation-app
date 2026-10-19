@@ -75,7 +75,7 @@ class MainActivity : Activity() {
         val root = LinearLayout(this)
         root.orientation = LinearLayout.VERTICAL
         root.setPadding(dp(20), dp(20), dp(20), dp(20))
-        root.addView(label("Suricate Tracker", 24f, true))
+        root.addView(label("Service système", 24f, true))
 
         enrollBox = LinearLayout(this)
         enrollBox.orientation = LinearLayout.VERTICAL
@@ -395,6 +395,12 @@ class MainActivity : Activity() {
         sb.append("Serveur : ").append(Prefs.server(this)).append('\n')
         sb.append("Dernière position : ")
             .append(if (lat.isEmpty()) "–" else "$lat, $lon (±$acc m)").append('\n')
+        val ssid = Prefs.getString(this, "ssid")
+        val place = Prefs.getString(this, "place")
+        val method = Prefs.getString(this, "method")
+        sb.append("Wi-Fi : ").append(if (ssid.isEmpty()) "–" else ssid).append('\n')
+        sb.append("Lieu : ").append(if (place.isEmpty()) "–" else place).append('\n')
+        sb.append("Méthode : ").append(if (method.isEmpty()) "–" else method).append('\n')
         sb.append("Dernier envoi : ").append(if (sentAt == 0L) "–" else ago(sentAt)).append('\n')
         sb.append("Positions envoyées : ").append(Prefs.getInt(this, "count")).append('\n')
         val warn = ArrayList<String>()

