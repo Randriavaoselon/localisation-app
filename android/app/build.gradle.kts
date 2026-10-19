@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId = "mg.suricate.tracker"
-        minSdk = 26
+        minSdk = 24          // Android 7.0 minimum
         targetSdk = 34
         versionCode = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
         versionName = "1.0"
@@ -34,6 +34,8 @@ android {
                 storePassword = "suricate-tracker"
                 keyAlias = "suricate"
                 keyPassword = "suricate-tracker"
+                enableV1Signing = true   // signature compatible avec tous les Android 7+
+                enableV2Signing = true
             }
         }
     }

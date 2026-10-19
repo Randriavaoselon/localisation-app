@@ -41,7 +41,8 @@ class TrackerService : Service() {
 
         fun start(context: Context) {
             try {
-                context.startForegroundService(Intent(context, TrackerService::class.java))
+                val i = Intent(context, TrackerService::class.java)
+                if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(i) else context.startService(i)
             } catch (e: Exception) {
                 Prefs.putStatus(context) { it.putString("err", "Démarrage du service refusé : " + (e.message ?: "")) }
             }
@@ -85,8 +86,10 @@ class TrackerService : Service() {
     override fun onCreate() {
         super.onCreate()
         lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        val channel = NotificationChannel(CHANNEL, "Suivi de position", NotificationManager.IMPORTANCE_LOW)
-        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        if (Build.VERSION.SDK_INT >= 26) {          // les canaux n'existent qu'à partir d'Android 8
+            val channel = NotificationChannel(CHANNEL, "Suivi de position", NotificationManager.IMPORTANCE_LOW)
+            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        }
         sentCount = Prefs.getInt(this, "count")
     }
 
@@ -179,7 +182,7 @@ class TrackerService : Service() {
             .put("method", "Android · " + (if (fix.provider == LocationManager.GPS_PROVIDER) "GPS" else "réseau"))
             .put("approx", fix.accuracy > 2000f)
         if (fix.hasAltitude()) pos.put("altitude", fix.altitude)
-        if (fix.hasVerticalAccuracy()) pos.put("altitude_accuracy", fix.verticalAccuracyMeters.toDouble())
+        if (Build.VERSION.SDK_INT >= 26 && fix.hasVerticalAccuracy()) pos.put("altitude_accuracy", fix.verticalAccuracyMeters.toDouble())
         val fmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
         fmt.timeZone = TimeZone.getTimeZone("UTC")
         val body = JSONObject().put("position", pos).put("client_time", fmt.format(Date(fix.time)))
@@ -305,12 +308,18 @@ class TrackerService : Service() {
         getSystemService(NotificationManager::class.java).notify(NOTIF_ID, buildNotification(text))
     }
 
+    @Suppress("DEPRECATION")
     private fun buildNotification(text: String): Notification {
         val pi = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        return Notification.Builder(this, CHANNEL)
+        val builder = if (Build.VERSION.SDK_INT >= 26) {
+            Notification.Builder(this, CHANNEL)
+        } else {
+            Notification.Builder(this).setPriority(Notification.PRIORITY_LOW)
+        }
+        return builder
             .setContentTitle("Suricate Tracker")
             .setContentText(text)
             .setSmallIcon(R.drawable.ic_stat)

@@ -260,7 +260,7 @@ class MainActivity : Activity() {
             ask(
                 "Autoriser la position",
                 "Suricate a besoin de la position précise de ce téléphone. À la question suivante, " +
-                    "choisissez « Précise » puis « Pendant l'utilisation de l'application ».",
+                    "choisissez « Autoriser » (ou « Précise » puis « Pendant l'utilisation de l'application » sur les Android récents).",
                 "Continuer"
             ) {
                 flag("askedLoc")
