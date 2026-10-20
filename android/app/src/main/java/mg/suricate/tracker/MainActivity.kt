@@ -130,8 +130,9 @@ class MainActivity : Activity() {
         if (uri.scheme != "suricate") return
         val s = uri.getQueryParameter("server")
         val c = uri.getQueryParameter("code")
+        if (c.isNullOrEmpty()) return      // lien "suricate://enroll" tout court : juste rouvrir l'écran, sans toucher à l'activation
         if (!s.isNullOrEmpty()) serverInput.setText(s)
-        if (!c.isNullOrEmpty()) codeInput.setText(c)
+        codeInput.setText(c)
         showEnroll = true
         enrollMsg.text = "Vérifiez l'adresse du serveur, puis touchez « Activer »."
     }

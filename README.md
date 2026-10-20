@@ -71,11 +71,11 @@ Une vraie application Android (dossier `android/`, fabriquée par GitHub Actions
 
 **Installer sur le téléphone**
 
-1. Sur le tableau de bord, créez un client dédié au téléphone (ex. `Téléphone-Alice`) puis cliquez sur **📱 Android** : un lien de téléchargement et un code d'activation (30 minutes, usage unique) s'affichent.
-2. Sur le téléphone, ouvrez le lien dans Chrome, téléchargez l'APK et installez-le (Android demande d'autoriser « Installer des applications inconnues » pour Chrome).
-3. Ouvrez **Suricate**, saisissez le code (l'adresse du serveur est déjà remplie) et touchez **Activer**.
-4. L'application demande, dans l'ordre : la position précise, les notifications, **« Toujours autoriser »** la position, l'activation du **GPS**, puis l'exemption d'optimisation de batterie. Acceptez tout.
-5. Le suivi se démarre et s'arrête avec **▶ Démarrer / ⏹ Arrêter** sur le tableau de bord.
+1. Sur le tableau de bord, créez un client dédié au téléphone (ex. `Téléphone-Alice`) puis cliquez sur **📱 Android** : la fenêtre affiche deux liens différents, à bien distinguer.
+2. Le lien de **téléchargement** (`/download/android`) sert uniquement à installer ou mettre à jour l'application : ouvert dans Chrome, il télécharge l'APK à chaque fois, même si elle est déjà installée. Ne l'utilisez que pour l'installation initiale ou une mise à jour, pas pour « l'ouvrir ».
+3. Après l'installation, ouvrez l'application avec le lien **« Ouvrir avec le code déjà saisi »** et saisissez le code (adresse du serveur déjà remplie). L'application demande alors, dans l'ordre : la position précise, **« Toujours autoriser »** la position, l'activation de la localisation, puis l'exemption de batterie. Acceptez tout.
+4. Le suivi se démarre et s'arrête avec **▶ Démarrer / ⏹ Arrêter** sur le tableau de bord.
+5. Pour rouvrir l'application plus tard — par exemple pour vérifier son état — **sans la retélécharger ni créer de nouveau code**, utilisez le lien **« Rouvrir l'application »** affiché en bas de la même fenêtre (`suricate://enroll`, sans paramètres). Gardez-le : dans un message que vous vous envoyez, ou en favori Chrome. C'est le seul moyen de rouvrir l'application, puisqu'elle n'a pas d'icône.
 
 **Ce que fait l'application**
 
@@ -84,8 +84,8 @@ Une vraie application Android (dossier `android/`, fabriquée par GitHub Actions
 - Certains téléphones (Xiaomi, Tecno, Infinix, Huawei, Oppo, Samsung en mode économie…) coupent les applications en arrière-plan malgré tout : ouvrez les réglages de l'application et activez « Démarrage automatique » / « Aucune restriction » pour la batterie.
 - Si Android affiche « L'application n'a pas été installée », vérifiez d'abord la version d'Android (7.0 minimum), puis désinstallez toute ancienne version de Suricate et retéléchargez l'APK depuis le lien du tableau de bord. Si Play Protect bloque l'installation, choisissez « Plus de détails » puis « Installer quand même ».
 - Sur Android 7.0 et 7.1.0, la connexion au serveur échoue si le certificat HTTPS n'est pas reconnu par le téléphone : si la page du tableau de bord s'ouvre sans avertissement dans Chrome sur ce téléphone, l'application pourra aussi s'y connecter.
-- Les positions contiennent coordonnées, précision, altitude et la méthode (GPS ou réseau). Le nom du Wi-Fi n'est pas transmis. L'adresse du serveur doit être en `https://`.
-- Mise à jour : relancez le workflow, téléchargez de nouveau l'APK sur le téléphone et installez-le par-dessus (la clé de signature étant conservée, rien n'est perdu).
+- Comme le client Windows, l'application envoie à chaque mesure : le nom du Wi-Fi connecté (SSID), son adresse MAC (BSSID) et la puissance du signal, le nombre de routeurs voisins, la position (coordonnées, précision, altitude, méthode) et le **nom du lieu** (quartier, ville) obtenu par OpenStreetMap Nominatim. Le nom du Wi-Fi et les routeurs voisins ne sont visibles par Android que si la localisation est autorisée et allumée. Si la position du téléphone est faible (précision au-delà de 150 m) ou absente, par exemple GPS coupé, l'application utilise comme secours les routeurs voisins (BeaconDB, puis Mylnikov) et en dernier recours l'adresse IP (marquée approximative). Au changement de réseau Wi-Fi, l'ancien lieu est oublié. L'adresse du serveur doit être en `https://`. Ces services externes (BeaconDB, Mylnikov, OpenStreetMap, ipwho.is) reçoivent les adresses MAC des routeurs voisins ou les coordonnées, exactement comme avec le client Windows.
+- Mise à jour : relancez le workflow, téléchargez de nouveau l'APK sur le téléphone et installez-le par-dessus (la clé de signature étant conservée, rien n'est perdu). Le renommage et le masquage de l'icône s'appliquent aussi à une mise à jour installée par-dessus une ancienne version visible : relancez le workflow puis réinstallez pour que l'icône disparaisse (un redémarrage du téléphone peut être nécessaire pour qu'elle disparaisse du tiroir d'applications).
 
 **Secours sans installation** : la page `/android/` (PWA) fonctionne dans Chrome, mais seulement écran allumé et page ouverte ; elle ne démarre pas seule et ne peut pas activer le GPS.
 

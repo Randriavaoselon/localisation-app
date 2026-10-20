@@ -1524,12 +1524,14 @@ async function androidInstall(c) {
   try { j = await api("/api/clients/" + c.id + "/enroll", "POST", {}); }
   catch (e) { alert(e.message); return; }
   const apk = location.origin + "/download/android";
-  const deep = "suricate://enroll?server=" + encodeURIComponent(location.origin) + "&code=" + j.code;
+  const activate = "suricate://enroll?server=" + encodeURIComponent(location.origin) + "&code=" + j.code;
+  const reopen = "suricate://enroll";    // lien stable : rouvre l'écran sans retélécharger ni créer de code
   showModal(box => {
     box.appendChild(el("h2", "📱 Installer « " + c.name + " » sur Android"));
     if (j.android_available) {
-      box.appendChild(el("p", "1. Sur le téléphone, ouvrez ce lien dans Chrome pour télécharger l'application. " +
-        "Android demandera d'autoriser l'installation d'applications depuis ce navigateur : acceptez.", "note"));
+      box.appendChild(el("p", "1. Sur le téléphone, ouvrez ce lien dans Chrome pour télécharger l'application " +
+        "(seulement si elle n'est pas déjà installée). Android demandera d'autoriser l'installation " +
+        "d'applications depuis ce navigateur : acceptez.", "note"));
       box.appendChild(el("pre", apk));
       const a = el("a", "⬇ Télécharger SuricateTracker.apk", "dl"); a.href = "/download/android";
       box.appendChild(a);
@@ -1537,18 +1539,25 @@ async function androidInstall(c) {
       box.appendChild(el("p", "L'application Android n'est pas encore publiée sur ce serveur (README : onglet Actions de GitHub > " +
         "« Fabriquer l'application Android (APK) », puis git pull et Reload sur le serveur).", "note"));
     }
-    box.appendChild(el("p", "2. Ouvrez « Suricate » et saisissez ce code d'activation (l'adresse du serveur est déjà remplie) :", "note"));
+    box.appendChild(el("p", "2. Une fois installée, ouvrez « Service système » (aucune icône : utilisez ce lien) et saisissez " +
+      "ce code d'activation, valable " + Math.round(j.expires_in_s / 60) + " minutes et à usage unique " +
+      "(l'adresse du serveur est déjà remplie) :", "note"));
     box.appendChild(el("pre", j.code));
-    const dl = el("a", "Ou, depuis le téléphone : ouvrir Suricate avec le code déjà saisi", "dl"); dl.href = deep;
-    box.appendChild(dl);
-    box.appendChild(el("p", "3. L'application demande ensuite : position précise, notifications, « Toujours autoriser », " +
-      "activation du GPS et batterie. Acceptez tout : le GPS doit rester allumé, et le suivi redémarre alors tout seul " +
-      "à chaque démarrage du téléphone (en arrière-plan, avec la notification « Suivi actif »). " +
+    const act = el("a", "Ouvrir avec le code déjà saisi (1ʳᵉ fois, ou pour changer de serveur)", "dl"); act.href = activate;
+    box.appendChild(act);
+    box.appendChild(el("p", "3. L'application demande ensuite : position précise, « Toujours autoriser » la position, " +
+      "activation de la localisation et batterie. Acceptez tout : la localisation doit rester allumée, et le suivi " +
+      "redémarre alors tout seul à chaque démarrage du téléphone (discrètement, en arrière-plan). " +
       "Le suivi se lance avec ▶ Démarrer sur ce tableau de bord.", "note"));
-    box.appendChild(el("p", "Le code est valable " + Math.round(j.expires_in_s / 60) + " minutes et ne sert qu'une fois. " +
-      "L'enregistrement remplace le jeton précédent de ce client : un client = un appareil, créez un client dédié au téléphone. " +
-      "Secours sans installation (limité : écran allumé, page ouverte) : " + location.origin + "/android/#code=" + j.code, "note"));
-    const copy = btn("Copier le lien de l'application", () => copyText(apk, copy));
+    box.appendChild(el("p", "4. Pour rouvrir l'application plus tard (vérifier l'état, par exemple), sans la retélécharger " +
+      "ni créer de nouveau code, utilisez ce lien à la place — gardez-le (message, favori Chrome) :", "note"));
+    box.appendChild(el("pre", reopen));
+    const ro = el("a", "Rouvrir l'application", "dl"); ro.href = reopen;
+    box.appendChild(ro);
+    box.appendChild(el("p", "Activer nomme le téléphone remplace le jeton précédent de ce client : un client = un appareil, " +
+      "créez un client dédié au téléphone. Secours sans installation (limité : écran allumé, page ouverte) : " +
+      location.origin + "/android/#code=" + j.code, "note"));
+    const copy = btn("Copier le lien de téléchargement", () => copyText(apk, copy));
     modalButtons(box, [copy, btn("Fermer", closeModal, true)]);
   });
 }
